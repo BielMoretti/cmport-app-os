@@ -6,14 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VerAssinatura } from '@/components/Assinatura';
 import AvisoDaFila from '@/components/AvisoDaFila';
-import { Aviso, Botao, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
+import { Aviso, Botao, Campo, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { urlAbsoluta } from '@/lib/config';
 import { useFila } from '@/lib/fila';
 import { reduzirFoto } from '@/lib/foto';
 import { descreverMarcacao, marcarAqui } from '@/lib/local';
 import { irAteOLocal } from '@/lib/rota';
-import { anexarFoto, buscarOS, fazerCheckin, marcarItem, osNoCelular, pausar, pendenciasParaConcluir, quando, retomar } from '@/lib/os';
+import {
+  anexarFoto, buscarOS, fazerCheckin, mandarMensagem, marcarItem, osNoCelular, passouDoPrazo, pausar, pendenciasParaConcluir, quando,
+  retomar,
+} from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
 
@@ -50,6 +53,7 @@ export default function DetalheDaOS() {
   const [erro, setErro] = useState<string | null>(null);
   // qual ação está rodando (mostra o carregando só no botão dela)
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [mensagem, setMensagem] = useState('');
 
   // volta da tela de concluir: busca de novo para mostrar a OS concluída
   useFocusEffect(useCallback(() => {
@@ -110,6 +114,9 @@ export default function DetalheDaOS() {
   const podeFotografar = os.situacao === 'andamento' || os.situacao === 'pausada';
   const feitos = os.checklist.filter(i => i.feito).length;
   const falta = pendenciasParaConcluir(os);
+  const mensagens = os.mensagens ?? [];
+  const emAberto = os.situacao === 'aberta' || os.situacao === 'andamento' || os.situacao === 'pausada';
+  const foraDoPrazo = emAberto && passouDoPrazo(os);
 
   return (
     <View style={{ flex: 1 }}>
@@ -154,6 +161,9 @@ export default function DetalheDaOS() {
           <Linha rotulo="Cliente" valor={os.cliente.nome} />
           <Linha rotulo="Endereço" valor={os.endereco} />
           <Linha rotulo="Agendada" valor={quando(os.agendada_para)} />
+          {emAberto && !!os.prazo_em && (
+            <Linha rotulo="Prazo para concluir" valor={`${quando(os.prazo_em)}${foraDoPrazo ? ' · já passou' : ''}`} />
+          )}
           <Linha rotulo="Tipo" valor={`${os.tipo} · prioridade ${ROTULO_PRIORIDADE[os.prioridade].toLowerCase()}`} />
           {os.checkin && <Linha rotulo="Check-in" valor={descreverMarcacao(os.checkin)} />}
           {os.conclusao && <Linha rotulo="Concluída" valor={descreverMarcacao(os.conclusao)} />}
@@ -225,6 +235,26 @@ export default function DetalheDaOS() {
           </>
         )}
 
+        {(os.situacao !== 'cancelada' || mensagens.length > 0) && (
+          <Secao titulo="Conversa com o escritório" extra={mensagens.length ? String(mensagens.length) : undefined}>
+            {mensagens.length === 0 && <Text style={styles.ajuda}>Precisa de algo do escritório? Escreva aqui. Sem sinal, a mensagem espera e sobe depois.</Text>}
+            {mensagens.map(m => (
+              <View key={m.id} style={[styles.balao, m.autor === 'tecnico' ? styles.balaoMeu : styles.balaoDeles]}>
+                <Text style={styles.legendaBalao}>{m.autor === 'tecnico' ? 'Você' : m.nome} · {quando(m.em)}{m.id < 0 ? ' · no celular' : ''}</Text>
+                <Text style={styles.descricao}>{m.texto}</Text>
+              </View>
+            ))}
+            {os.situacao !== 'cancelada' && (
+              <View style={{ gap: espaco[2] }}>
+                <Campo rotulo="Mensagem" value={mensagem} onChangeText={setMensagem} multiline maxLength={2000}
+                  placeholder="Ex.: a portaria não libera a entrada" />
+                <Botao tipo="secundario" rotulo="Enviar" carregando={ocupado === 'mensagem'} desativado={!mensagem.trim() || !!ocupado}
+                  onPress={() => agir('mensagem', async () => { const nova = await mandarMensagem(os.id, mensagem.trim()); setMensagem(''); return nova; })} />
+              </View>
+            )}
+          </Secao>
+        )}
+
         {emAtendimento && (
           <View style={{ gap: espaco[3] }}>
             {falta.length > 0 && <Aviso tipo="info" texto={`Para concluir falta: ${falta.join(' e ')}.`} />}
@@ -258,4 +288,8 @@ const criarEstilos = (c: Paleta) => StyleSheet.create({
   foto: { width: 96, height: 96, borderRadius: raio.pequeno, backgroundColor: c.superficieForte },
   legenda: { width: 96, fontFamily: fontes.texto, fontSize: corpo.micro, color: c.textoSuave },
   dupla: { flexDirection: 'row', gap: espaco[2] },
+  balao: { borderRadius: raio.pequeno, paddingHorizontal: espaco[3], paddingVertical: espaco[2], gap: espaco[0.5], maxWidth: '88%' },
+  balaoMeu: { alignSelf: 'flex-end', backgroundColor: c.azulSuave },
+  balaoDeles: { alignSelf: 'flex-start', backgroundColor: c.superficieForte },
+  legendaBalao: { fontFamily: fontes.textoForte, fontSize: corpo.micro, color: c.textoSuave },
 });

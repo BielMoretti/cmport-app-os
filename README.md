@@ -44,6 +44,9 @@ dias; no primeiro acesso o app pede para criar a senha. A sessão renova sozinha
   projeto no EAS (`eas init`, grava o `projectId` no app.json) e pôr o `google-services.json` do
   Firebase do app novo; sem isso o app pula o registro e o resto funciona normal.
 - **Relato por voz**: pelo microfone do teclado do celular (a dica aparece no campo).
+- **Conversa com o escritório**: na própria OS. A mensagem do escritório chega como aviso; a do
+  técnico sem sinal espera na fila como as outras ações ("no celular") e não duplica ao reenviar.
+- **Prazo para concluir**: vem da prioridade (configurado na dash); a OS mostra quando passou.
 
 ## Sem internet
 

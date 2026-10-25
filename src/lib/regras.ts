@@ -11,6 +11,7 @@ export type Acao =
   | { tipo: 'pausar' | 'retomar'; os: number; em: string }
   | { tipo: 'item'; os: number; item: number; feito: boolean; em: string }
   | { tipo: 'foto'; os: number; em: string; idCliente: string; uri: string; nome: string; tipoArquivo: string; legenda: string }
+  | { tipo: 'mensagem'; os: number; em: string; idCliente: string; texto: string }
   | {
       tipo: 'concluir'; os: number; em: string; relato: string; assinatura: { nome: string; traco: string };
       lat: number | null; lng: number | null; precisao: number | null;
@@ -66,6 +67,11 @@ export function aplicar(atual: OrdemServico, a: Acao): OrdemServico {
         os.fotos.push({ id: -(os.fotos.length + 1), url: a.uri, legenda: a.legenda, tirada_em: a.em });
       }
       break;
+    case 'mensagem':
+      exigir(os, ['solicitada', 'aberta', 'andamento', 'pausada', 'concluida'], 'mandar mensagem');
+      os.mensagens = [...(os.mensagens ?? []),
+        { id: -((os.mensagens?.length ?? 0) + 1), em: a.em, autor: 'tecnico', nome: os.tecnico?.nome ?? 'Você', texto: a.texto }];
+      break;
     case 'concluir': {
       exigir(os, ['andamento'], 'concluir');
       const falta = pendenciasParaConcluir(os);
@@ -92,7 +98,8 @@ export function jaFeita(os: OrdemServico, a: Acao): boolean {
     case 'retomar': return os.situacao === 'andamento';
     case 'item': return os.checklist.find(i => i.id === a.item)?.feito === a.feito;
     case 'concluir': return os.situacao === 'concluida';
-    case 'foto': return false;   // a foto repetida o servidor já ignora pela identidade
+    case 'foto':
+    case 'mensagem': return false;   // repetida o servidor já ignora pela identidade
   }
 }
 

@@ -1,7 +1,7 @@
 /**
  * Fila das ações do técnico que ainda não chegaram ao servidor (app sem internet).
  *
- * Toda ação (check-in, checklist, foto, pausar, retomar, concluir) entra aqui com a hora em que
+ * Toda ação (check-in, checklist, foto, mensagem, pausar, retomar, concluir) entra aqui com a hora em que
  * aconteceu e sobe na ordem quando há sinal. Gasto de bateria: nada de ficar perguntando — a fila
  * tenta ao entrar uma ação, quando o celular avisa que a conexão voltou (NetInfo) e quando o app
  * volta para a tela. Sem rede, para na primeira tentativa e espera o próximo aviso.
@@ -100,6 +100,8 @@ function enviar(a: Acao): Promise<OrdemServico> {
     case 'foto':
       return enviarArquivo(`/os/${a.os}/fotos`, { uri: a.uri, nome: a.nome, tipo: a.tipoArquivo },
         { legenda: a.legenda, em: a.em, id_cliente: a.idCliente });
+    case 'mensagem':
+      return api(`/os/${a.os}/mensagens`, { method: 'POST', body: { texto: a.texto, em: a.em, id_cliente: a.idCliente } });
     case 'concluir':
       return api(`/os/${a.os}/concluir`, { method: 'POST', body: { em: a.em, relato: a.relato, assinatura: a.assinatura, ...local } });
   }

@@ -12,6 +12,7 @@
  *   PATCH /os/{id}/checklist/{item} {feito, em}
  *   POST  /os/{id}/fotos (multipart: arquivo, legenda, em, id_cliente)
  *   POST  /os/{id}/concluir {em, relato, assinatura, lat, lng, precisao}
+ *   POST  /os/{id}/mensagens {texto, em, id_cliente}
  *
  * No MODO_DEMO não há servidor nem fila: as mesmas regras mudam os dados de exemplo.
  */
@@ -128,6 +129,11 @@ export async function anexarFoto(id: number, arquivo: { uri: string; nome: strin
   return agir({ tipo: 'foto', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, legenda });
 }
 
+/** Mensagem para o escritório: sem sinal, espera na fila como as outras ações. */
+export function mandarMensagem(id: number, texto: string): Promise<OrdemServico> {
+  return agir({ tipo: 'mensagem', os: id, em: agora(), idCliente: novaIdentidade('m'), texto });
+}
+
 export function concluir(
   id: number,
   dados: { relato: string; assinatura: { nome: string; traco: string }; aqui: Marcacao },
@@ -153,6 +159,11 @@ export function ordenarOS(lista: OrdemServico[]): OrdemServico[] {
     if (p !== 0) return p;
     return (a.agendada_para ?? a.criada_em).localeCompare(b.agendada_para ?? b.criada_em);
   });
+}
+
+/** O prazo para concluir (pela prioridade) já passou. */
+export function passouDoPrazo(os: OrdemServico): boolean {
+  return !!os.prazo_em && new Date(os.prazo_em).getTime() < Date.now();
 }
 
 /** "Hoje, 09:00", "Amanhã, 14:30" ou "12/11, 10:00". */

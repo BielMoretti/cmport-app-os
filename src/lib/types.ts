@@ -62,6 +62,15 @@ export interface Assinatura {
   em: string;
 }
 
+/** Conversa com o escritório. id negativo = ainda no celular, esperando sinal. */
+export interface Mensagem {
+  id: number;
+  em: string;
+  autor: 'tecnico' | 'equipe';
+  nome: string;
+  texto: string;
+}
+
 export interface OrdemServico {
   id: number;
   /** código que a equipe fala ao telefone, ex.: OS-2026-0042 */
@@ -89,6 +98,9 @@ export interface OrdemServico {
   assinatura: Assinatura | null;
   /** o que o técnico escreveu ao concluir */
   relato: string;
+  /** até quando concluir, pela prioridade (nulo = esperando aprovação) */
+  prazo_em?: string | null;
+  mensagens?: Mensagem[];
 }
 
 export const ROTULO_SITUACAO: Record<Situacao, string> = {
