@@ -1,0 +1,25 @@
+# dependências
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# nativo
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ambiente (nunca commitar endereço/segredo de produção)
+.env
+.env.local
+.env*.local
+
+# sistema
+.DS_Store
+*.log

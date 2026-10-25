@@ -1,0 +1,216 @@
+import { useCallback, useState, type ReactNode } from 'react';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { VerAssinatura } from '@/components/Assinatura';
+import { Aviso, Botao, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
+import { useEstilos, useTema } from '@/contexts/TemaContext';
+import { urlAbsoluta } from '@/lib/config';
+import { reduzirFoto } from '@/lib/foto';
+import { descreverMarcacao, marcarAqui } from '@/lib/local';
+import { anexarFoto, buscarOS, fazerCheckin, marcarItem, pausar, pendenciasParaConcluir, quando, retomar } from '@/lib/os';
+import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
+import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
+
+function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+  const styles = useEstilos(criarEstilos);
+  return (
+    <View style={styles.linha}>
+      <Text style={styles.rotulo}>{rotulo}</Text>
+      <Text style={styles.valor}>{valor}</Text>
+    </View>
+  );
+}
+
+function Secao({ titulo, children, extra }: { titulo: string; children: ReactNode; extra?: string }) {
+  const styles = useEstilos(criarEstilos);
+  return (
+    <Cartao>
+      <View style={styles.secaoTopo}>
+        <Text style={styles.rotulo}>{titulo}</Text>
+        {extra && <Text style={styles.extra}>{extra}</Text>}
+      </View>
+      {children}
+    </Cartao>
+  );
+}
+
+export default function DetalheDaOS() {
+  const styles = useEstilos(criarEstilos);
+  const { cores } = useTema();
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const margem = useSafeAreaInsets();
+  const [os, setOs] = useState<OrdemServico | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  // qual ação está rodando (mostra o carregando só no botão dela)
+  const [ocupado, setOcupado] = useState<string | null>(null);
+
+  // volta da tela de concluir: busca de novo para mostrar a OS concluída
+  useFocusEffect(useCallback(() => {
+    let cancelado = false;
+    buscarOS(Number(id))
+      .then(achada => { if (!cancelado) setOs(achada); })
+      .catch(e => { if (!cancelado) setErro(e instanceof Error ? e.message : 'Não foi possível abrir a OS.'); });
+    return () => { cancelado = true; };
+  }, [id]));
+
+  async function agir(nome: string, acao: () => Promise<OrdemServico>) {
+    setErro(null);
+    setOcupado(nome);
+    try {
+      setOs(await acao());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não deu certo. Tente de novo.');
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  async function tirarFoto(atual: OrdemServico) {
+    // no navegador não há câmera do sistema: escolhe um arquivo
+    const pedido = Platform.OS === 'web'
+      ? await ImagePicker.requestMediaLibraryPermissionsAsync()
+      : await ImagePicker.requestCameraPermissionsAsync();
+    if (!pedido.granted) { setErro('Sem permissão para a câmera. Libere nas configurações do celular.'); return; }
+    const opcoes: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.6, exif: false };
+    const r = Platform.OS === 'web' ? await ImagePicker.launchImageLibraryAsync(opcoes) : await ImagePicker.launchCameraAsync(opcoes);
+    if (r.canceled || !r.assets[0]) return;
+    const a = r.assets[0];
+    // reduz antes de subir (4 a 8 MB da câmera viram uns 300 KB): o servidor aceita até 3 MB
+    await agir('foto', async () => anexarFoto(atual.id, await reduzirFoto(a.uri, a.width), `Foto ${atual.fotos.length + 1}`));
+  }
+
+  if (!os) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Topo titulo="OS" />
+        {erro ? <View style={styles.conteudo}><Aviso texto={erro} /></View> : <Carregando />}
+      </View>
+    );
+  }
+
+  const emAtendimento = os.situacao === 'andamento';
+  const podeFotografar = os.situacao === 'andamento' || os.situacao === 'pausada';
+  const feitos = os.checklist.filter(i => i.feito).length;
+  const falta = pendenciasParaConcluir(os);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Topo titulo={os.numero} />
+      <ScrollView contentContainerStyle={[styles.conteudo, { paddingBottom: margem.bottom + espaco[10] }]}>
+        <View style={{ gap: espaco[2] }}>
+          <SeloSituacao situacao={os.situacao} />
+          <Text style={styles.titulo} accessibilityRole="header">{os.titulo}</Text>
+        </View>
+
+        {erro && <Aviso texto={erro} />}
+
+        {/* a ação principal de cada momento fica no topo */}
+        {os.situacao === 'aberta' && (
+          <View style={{ gap: espaco[2] }}>
+            <Botao rotulo="Cheguei no local" carregando={ocupado === 'checkin'} desativado={!!ocupado}
+              onPress={() => agir('checkin', async () => fazerCheckin(os.id, await marcarAqui()))} />
+            <Text style={styles.ajuda}>Marca a hora e a sua localização e começa o atendimento.</Text>
+          </View>
+        )}
+        {os.situacao === 'pausada' && (
+          <Botao rotulo="Retomar atendimento" carregando={ocupado === 'retomar'} desativado={!!ocupado}
+            onPress={() => agir('retomar', () => retomar(os.id))} />
+        )}
+
+        <Cartao>
+          <Linha rotulo="Cliente" valor={os.cliente.nome} />
+          <Linha rotulo="Endereço" valor={os.endereco} />
+          <Linha rotulo="Agendada" valor={quando(os.agendada_para)} />
+          <Linha rotulo="Tipo" valor={`${os.tipo} · prioridade ${ROTULO_PRIORIDADE[os.prioridade].toLowerCase()}`} />
+          {os.checkin && <Linha rotulo="Check-in" valor={descreverMarcacao(os.checkin)} />}
+          {os.conclusao && <Linha rotulo="Concluída" valor={descreverMarcacao(os.conclusao)} />}
+        </Cartao>
+
+        <Secao titulo="O que fazer">
+          <Text style={styles.descricao}>{os.descricao}</Text>
+        </Secao>
+
+        {os.checklist.length > 0 && (
+          <Secao titulo="Checklist" extra={`${feitos} de ${os.checklist.length}`}>
+            {os.checklist.map(item => (
+              <Pressable
+                key={item.id}
+                disabled={!emAtendimento}
+                onPress={() => agir(`item-${item.id}`, () => marcarItem(os.id, item.id, !item.feito))}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: item.feito, disabled: !emAtendimento }}
+                style={styles.item}
+              >
+                <View style={[styles.caixa, item.feito && { backgroundColor: cores.azul, borderColor: cores.azul }]}>
+                  {item.feito && <Text style={styles.marca}>✓</Text>}
+                </View>
+                <Text style={[styles.itemTexto, item.feito && styles.itemFeito]}>{item.texto}</Text>
+              </Pressable>
+            ))}
+            {os.situacao === 'aberta' && <Text style={styles.ajuda}>Faça o check-in para marcar os itens.</Text>}
+          </Secao>
+        )}
+
+        {(podeFotografar || os.fotos.length > 0) && (
+          <Secao titulo="Fotos" extra={os.fotos.length ? String(os.fotos.length) : undefined}>
+            {os.fotos.length > 0 && (
+              <View style={styles.fotos}>
+                {os.fotos.map(f => (
+                  <Image key={f.id} source={{ uri: urlAbsoluta(f.url) }} style={styles.foto} accessibilityLabel={f.legenda} />
+                ))}
+              </View>
+            )}
+            {podeFotografar && (
+              <Botao tipo="secundario" rotulo={Platform.OS === 'web' ? 'Anexar foto' : 'Tirar foto'}
+                carregando={ocupado === 'foto'} desativado={!!ocupado} onPress={() => tirarFoto(os)} />
+            )}
+          </Secao>
+        )}
+
+        {os.situacao === 'concluida' && (
+          <>
+            {!!os.relato && <Secao titulo="Relato do técnico"><Text style={styles.descricao}>{os.relato}</Text></Secao>}
+            {os.assinatura && (
+              <Secao titulo="Assinatura do cliente" extra={os.assinatura.nome}>
+                <VerAssinatura traco={os.assinatura.traco} />
+              </Secao>
+            )}
+          </>
+        )}
+
+        {emAtendimento && (
+          <View style={{ gap: espaco[3] }}>
+            {falta.length > 0 && <Aviso tipo="info" texto={`Para concluir falta: ${falta.join(' e ')}.`} />}
+            <Botao rotulo="Concluir OS" desativado={falta.length > 0 || !!ocupado}
+              onPress={() => router.push({ pathname: '/os/[id]/concluir', params: { id: String(os.id) } })} />
+            <Botao tipo="secundario" rotulo="Pausar" carregando={ocupado === 'pausar'} desativado={!!ocupado}
+              onPress={() => agir('pausar', () => pausar(os.id))} />
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const criarEstilos = (c: Paleta) => StyleSheet.create({
+  conteudo: { paddingHorizontal: componentes.tela.margem, gap: espaco[4], width: '100%', maxWidth: componentes.conteudo.larguraMaxima, alignSelf: 'center' },
+  titulo: { fontFamily: fontes.nome, fontSize: corpo.titulo, color: c.texto },
+  linha: { gap: espaco[0.5] },
+  rotulo: { fontFamily: fontes.textoForte, fontSize: corpo.micro, color: c.textoSuave, textTransform: 'uppercase', letterSpacing: 0.6 },
+  valor: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.texto },
+  descricao: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.texto, lineHeight: 22 },
+  ajuda: { fontFamily: fontes.texto, fontSize: corpo.pequeno, color: c.textoSuave },
+  secaoTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  extra: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.textoSuave },
+  item: { flexDirection: 'row', alignItems: 'center', gap: espaco[3], minHeight: componentes.alvoDeToque },
+  caixa: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: c.textoSuave, alignItems: 'center', justifyContent: 'center' },
+  marca: { color: c.sobreAzul, fontFamily: fontes.nome, fontSize: corpo.legenda, lineHeight: 18 },
+  itemTexto: { flex: 1, fontFamily: fontes.texto, fontSize: corpo.base, color: c.texto },
+  itemFeito: { color: c.textoSuave, textDecorationLine: 'line-through' },
+  fotos: { flexDirection: 'row', flexWrap: 'wrap', gap: espaco[2] },
+  foto: { width: 96, height: 96, borderRadius: raio.pequeno, backgroundColor: c.superficieForte },
+});
