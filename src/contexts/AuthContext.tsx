@@ -10,6 +10,8 @@ import type { Papel, RespostaDeLogin } from '@/lib/types';
 const CHAVE_SESSAO = 'cmport_os_sessao';
 // de quem são a fila e as OS guardadas no aparelho (outro técnico entrando = começa limpo)
 const CHAVE_DONO = 'cmport_os_dono';
+// a tela de permissões já passou neste aparelho (as permissões são do aparelho, não da conta)
+const CHAVE_PERMISSOES = 'cmport_os_permissoes_vistas';
 
 interface Sessao {
   token: string;
@@ -17,6 +19,8 @@ interface Sessao {
   role: Papel;
   /** login com a senha provisória da equipe: só a tela de criar a senha abre */
   trocarSenha: boolean;
+  /** versão dos termos que falta aceitar (quem decide é o servidor): até aceitar, só a tela dos termos abre */
+  termosPendentes?: string | null;
 }
 
 interface AuthContextValue {
@@ -29,6 +33,11 @@ interface AuthContextValue {
   criarSenha: (senhaNova: string, senhaAtual?: string) => Promise<void>;
   /** a senha digitada no login, enquanto a troca obrigatória não foi feita. Só na memória */
   senhaInicial: () => string | null;
+  /** grava no servidor o aceite da versão pendente dos termos e libera o app */
+  aceitarTermos: () => Promise<void>;
+  /** a tela de permissões do primeiro acesso já passou neste aparelho */
+  permissoesVistas: boolean;
+  concluirPermissoes: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true);
   // nunca é gravada: serve só para a troca obrigatória não pedir de novo a senha recém-digitada
   const senhaDoLogin = useRef<string | null>(null);
+  const [permissoesVistas, setPermissoesVistas] = useState(true);
 
   const guardar = useCallback((sessao: Sessao) => {
     setToken(sessao.token);
@@ -82,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
+        setPermissoesVistas((await lerItem(CHAVE_PERMISSOES).catch(() => null)) === 'sim');
         const salvo = await lerItem(CHAVE_SESSAO);
         const sessao = salvo ? (JSON.parse(salvo) as Sessao) : null;
         if (sessao && tokenValido(sessao.token)) {
@@ -108,12 +119,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setAoExpirar(null);
   }, [encerrar]);
 
+  // termos: pergunta ao servidor a cada abertura (texto novo = aceite de novo). Sem sinal ou servidor
+  // antigo (sem o campo): não trava ninguém
+  const token = usuario?.token;
+  useEffect(() => {
+    if (!token || MODO_DEMO) return;
+    let vivo = true;
+    api<{ termos_pendentes?: string | null }>('/auth/me')
+      .then(me => {
+        if (!vivo || me.termos_pendentes === undefined) return;
+        setUsuario(atual => (atual && (atual.termosPendentes ?? null) !== me.termos_pendentes ? { ...atual, termosPendentes: me.termos_pendentes } : atual));
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [token]);
+
   const login = useCallback(async (email: string, senha: string) => {
     const limpo = email.trim().toLowerCase();
     if (!limpo || !senha) throw new ApiError(400, 'Preencha o e-mail e a senha.');
     const sessao: Sessao = MODO_DEMO
       // demonstração: qualquer e-mail e senha entram, sem rede
-      ? { token: 'demo', nome: 'Técnico de demonstração', role: 'TECNICO', trocarSenha: false }
+      // demonstração: qualquer e-mail e senha entram, sem rede; os termos aparecem para conferir a tela
+      ? { token: 'demo', nome: 'Técnico de demonstração', role: 'TECNICO', trocarSenha: false, termosPendentes: 'demo' }
       : daResposta(await api<RespostaDeLogin>('/auth/login', { method: 'POST', body: { email: limpo, senha } }));
     // outro técnico neste aparelho: a fila e as OS guardadas eram do anterior
     const dono = await lerItem(CHAVE_DONO).catch(() => null);
@@ -133,8 +160,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const senhaInicial = useCallback(() => senhaDoLogin.current, []);
 
-  const valor = useMemo(() => ({ usuario, carregando, login, logout, criarSenha, senhaInicial }),
-    [usuario, carregando, login, logout, criarSenha, senhaInicial]);
+  const aceitarTermos = useCallback(async () => {
+    const versao = usuario?.termosPendentes;
+    if (!usuario || !versao) return;
+    if (!MODO_DEMO) {
+      try {
+        await api('/auth/aceitar-termos', { method: 'POST', body: { versao } });
+      } catch (e) {
+        // o texto mudou enquanto a tela estava aberta: mostra a versão nova
+        if (e instanceof ApiError && e.status === 409) {
+          const me = await api<{ termos_pendentes?: string | null }>('/auth/me');
+          guardar({ ...usuario, termosPendentes: me.termos_pendentes ?? null });
+        }
+        throw e;
+      }
+    }
+    guardar({ ...usuario, termosPendentes: null });
+  }, [usuario, guardar]);
+
+  const concluirPermissoes = useCallback(() => {
+    setPermissoesVistas(true);
+    void salvarItem(CHAVE_PERMISSOES, 'sim').catch(() => {});
+  }, []);
+
+  const valor = useMemo(() => ({ usuario, carregando, login, logout, criarSenha, senhaInicial, aceitarTermos, permissoesVistas, concluirPermissoes }),
+    [usuario, carregando, login, logout, criarSenha, senhaInicial, aceitarTermos, permissoesVistas, concluirPermissoes]);
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;
 }

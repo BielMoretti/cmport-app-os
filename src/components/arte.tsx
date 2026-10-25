@@ -46,3 +46,38 @@ export function GlifoVoltar({ cor, tamanho = 22 }: Props) {
     </Svg>
   );
 }
+
+export function GlifoSino({ cor, tamanho = 22 }: Props) {
+  return (
+    <Svg width={tamanho} height={tamanho} viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+      <Path d="M10 20.5a2 2 0 0 0 4 0" />
+    </Svg>
+  );
+}
+
+export function GlifoCamera({ cor, tamanho = 22 }: Props) {
+  return (
+    <Svg width={tamanho} height={tamanho} viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <Circle cx={12} cy={13} r={3.5} />
+    </Svg>
+  );
+}
+
+export function GlifoMicrofone({ cor, tamanho = 22 }: Props) {
+  return (
+    <Svg width={tamanho} height={tamanho} viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x={9} y={3} width={6} height={11} rx={3} />
+      <Path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </Svg>
+  );
+}
+
+export function GlifoCheck({ cor, tamanho = 18 }: Props) {
+  return (
+    <Svg width={tamanho} height={tamanho} viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Svg>
+  );
+}

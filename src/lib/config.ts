@@ -16,6 +16,11 @@ export const API_URL = BRUTO;
 /** Sem endereço de API = roda só com dados de exemplo, sem rede. */
 export const MODO_DEMO = API_URL === '';
 
+/** Termos de uso e privacidade do app (páginas públicas no mesmo endereço da API). */
+const SITE = MODO_DEMO ? 'https://tec.cmport.com.br' : new URL(API_URL).origin;
+export const TERMOS_DE_USO = `${SITE}/termos`;
+export const POLITICA_DE_PRIVACIDADE = `${SITE}/privacidade`;
+
 /**
  * A API devolve o link das fotos como caminho ("/api/tecnico/v1/fotos/…"); a tela precisa do
  * endereço inteiro. Arquivo local (foto da demonstração) e link completo passam direto.

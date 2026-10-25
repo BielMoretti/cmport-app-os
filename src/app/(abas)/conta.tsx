@@ -58,7 +58,7 @@ export default function Conta() {
             {TEMAS.map(t => {
               const ativo = t.valor === preferencia;
               return (
-                <Pressable key={t.valor} onPress={() => escolher(t.valor)} accessibilityRole="radio" aria-checked={ativo}
+                <Pressable key={t.valor} onPress={() => escolher(t.valor)} accessibilityRole="radio" accessibilityState={{ checked: ativo }}
                   style={[styles.opcao, ativo && { backgroundColor: cores.azul }]}>
                   <Text style={[styles.opcaoTexto, ativo && { color: cores.sobreAzul }]}>{t.rotulo}</Text>
                 </Pressable>

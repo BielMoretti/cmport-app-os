@@ -17,10 +17,13 @@ import { vigiarConexao } from '@/lib/fila';
 import { temaEscuro } from '@/lib/tema';
 
 function Rotas() {
-  const { usuario, carregando } = useAuth();
+  const { usuario, carregando, permissoesVistas } = useAuth();
   const { cores, modo } = useTema();
   // logado: a fila sobe quando a conexão volta e quando o app volta para a tela (sem consultar)
-  const liberado = !!usuario && !usuario.trocarSenha;
+  // primeiro acesso, nesta ordem: criar a senha → aceitar os termos → permissões → o app
+  const senhaOk = !!usuario && !usuario.trocarSenha;
+  const termosOk = senhaOk && !usuario.termosPendentes;
+  const liberado = termosOk && permissoesVistas;
   useEffect(() => { if (liberado) { vigiarConexao(); void registrarAvisos(); } }, [liberado]);
   // tocar no aviso de OS nova abre a OS
   const router = useRouter();
@@ -43,7 +46,13 @@ function Rotas() {
         <Stack.Protected guard={!!usuario && usuario.trocarSenha}>
           <Stack.Screen name="primeira-senha" />
         </Stack.Protected>
-        <Stack.Protected guard={!!usuario && !usuario.trocarSenha}>
+        <Stack.Protected guard={senhaOk && !termosOk}>
+          <Stack.Screen name="termos" />
+        </Stack.Protected>
+        <Stack.Protected guard={termosOk && !permissoesVistas}>
+          <Stack.Screen name="permissoes" />
+        </Stack.Protected>
+        <Stack.Protected guard={liberado}>
           <Stack.Screen name="(abas)" />
           <Stack.Screen name="os/[id]/index" />
           <Stack.Screen name="os/[id]/concluir" />
