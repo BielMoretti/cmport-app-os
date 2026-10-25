@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { api, ApiError, renovarSessao, setAoExpirar, setAoRenovar, setToken } from '@/lib/api';
 import { apagarItem, lerItem, salvarItem } from '@/lib/armazenamento';
+import { desligarAvisos } from '@/lib/avisos';
 import { MODO_DEMO } from '@/lib/config';
 import { limparDoCelular } from '@/lib/os';
 import type { Papel, RespostaDeLogin } from '@/lib/types';
@@ -61,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // a sessão que vence sozinha NÃO apaga a fila: o técnico entra de novo e ela sobe
   const encerrar = useCallback(async (apagarDados: boolean) => {
+    // ainda com a sessão: o aparelho para de receber os avisos de quem está saindo
+    if (apagarDados) await desligarAvisos();
     senhaDoLogin.current = null;
     setToken(null);
     setUsuario(null);

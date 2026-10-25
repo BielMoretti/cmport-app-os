@@ -56,6 +56,7 @@ export default function ConcluirOS() {
           placeholder="Ex.: troquei o conector da câmera e testei no app com o síndico."
           style={{ minHeight: 110, textAlignVertical: 'top' }}
         />
+        <Text style={styles.ajuda}>Para ditar em vez de digitar, toque no microfone do teclado.</Text>
 
         <View style={{ gap: espaco[3] }}>
           <Text style={styles.rotulo}>Assinatura do cliente</Text>

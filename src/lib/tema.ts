@@ -95,6 +95,7 @@ export interface Paleta {
   erro: string;
   erroSuave: string;
   // situações da OS (sempre com rótulo escrito ao lado: a cor nunca fala sozinha)
+  solicitada: CorDeSituacao;
   aberta: CorDeSituacao;
   andamento: CorDeSituacao;
   pausada: CorDeSituacao;
@@ -122,6 +123,7 @@ export const paletas: Record<Modo, Paleta> = {
     brilho: '0px 10px 28px rgba(31, 95, 191, 0.22)',
     erro: cor.vermelho700,
     erroSuave: 'rgba(196, 39, 27, 0.10)',
+    solicitada: { texto: '#6D28D9', fundo: 'rgba(109, 40, 217, 0.10)' },
     aberta: { texto: cor.azul600, fundo: 'rgba(31, 95, 191, 0.10)' },
     andamento: { texto: cor.ambar700, fundo: 'rgba(154, 98, 0, 0.12)' },
     pausada: { texto: cor.cinza600, fundo: 'rgba(95, 102, 112, 0.12)' },
@@ -147,6 +149,7 @@ export const paletas: Record<Modo, Paleta> = {
     brilho: '0px 10px 30px rgba(47, 123, 255, 0.36)',
     erro: cor.vermelho300,
     erroSuave: 'rgba(240, 86, 78, 0.16)',
+    solicitada: { texto: '#C4B5FD', fundo: 'rgba(167, 139, 250, 0.18)' },
     aberta: { texto: cor.azul300, fundo: 'rgba(77, 143, 247, 0.18)' },
     andamento: { texto: cor.ambar300, fundo: 'rgba(255, 201, 77, 0.16)' },
     pausada: { texto: cor.cinza400, fundo: 'rgba(168, 168, 163, 0.16)' },

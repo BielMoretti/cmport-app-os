@@ -46,6 +46,21 @@
           "photosPermission": "O CMPort OS usa as suas fotos só para anexar ao serviço.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O CMPort OS usa a câmera para as fotos do serviço e para ler o QR das etiquetas.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#1E3A8A",
+          "defaultChannel": "os"
+        }
       ]
     ],
     "experiments": {

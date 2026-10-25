@@ -145,7 +145,7 @@ export async function limparDoCelular(): Promise<void> {
 }
 
 /** Ordem da lista: o que pede ação primeiro, concluídas e canceladas no fim. */
-const PESO: Record<Situacao, number> = { andamento: 0, aberta: 1, pausada: 2, concluida: 3, cancelada: 4 };
+const PESO: Record<Situacao, number> = { andamento: 0, aberta: 1, pausada: 2, solicitada: 3, concluida: 4, cancelada: 5 };
 
 export function ordenarOS(lista: OrdemServico[]): OrdemServico[] {
   return [...lista].sort((a, b) => {

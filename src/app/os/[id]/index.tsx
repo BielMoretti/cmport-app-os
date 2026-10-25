@@ -12,6 +12,7 @@ import { urlAbsoluta } from '@/lib/config';
 import { useFila } from '@/lib/fila';
 import { reduzirFoto } from '@/lib/foto';
 import { descreverMarcacao, marcarAqui } from '@/lib/local';
+import { irAteOLocal } from '@/lib/rota';
 import { anexarFoto, buscarOS, fazerCheckin, marcarItem, osNoCelular, pausar, pendenciasParaConcluir, quando, retomar } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
@@ -80,7 +81,8 @@ export default function DetalheDaOS() {
     }
   }
 
-  async function tirarFoto(atual: OrdemServico) {
+  // Antes / Depois: a legenda diz o momento, e o servidor carimba data, hora e local na foto
+  async function tirarFoto(atual: OrdemServico, momento: 'Antes' | 'Depois') {
     // no navegador não há câmera do sistema: escolhe um arquivo
     const pedido = Platform.OS === 'web'
       ? await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -91,7 +93,8 @@ export default function DetalheDaOS() {
     if (r.canceled || !r.assets[0]) return;
     const a = r.assets[0];
     // reduz antes de subir (4 a 8 MB da câmera viram uns 300 KB): o servidor aceita até 3 MB
-    await agir('foto', async () => anexarFoto(atual.id, await reduzirFoto(a.uri, a.width), `Foto ${atual.fotos.length + 1}`));
+    const n = atual.fotos.filter(f => f.legenda.startsWith(momento)).length + 1;
+    await agir(`foto-${momento}`, async () => anexarFoto(atual.id, await reduzirFoto(a.uri, a.width), `${momento} ${n}`));
   }
 
   if (!os) {
@@ -133,6 +136,20 @@ export default function DetalheDaOS() {
             onPress={() => agir('retomar', () => retomar(os.id))} />
         )}
 
+        {(os.situacao === 'aberta' || os.situacao === 'pausada' || os.situacao === 'andamento') && (
+          <View style={{ gap: espaco[2] }}>
+            <Text style={styles.rotulo}>Como chegar</Text>
+            <View style={styles.dupla}>
+              <View style={{ flex: 1 }}>
+                <Botao tipo="secundario" rotulo="Google Maps" onPress={() => { void irAteOLocal(os, 'google'); }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Botao tipo="secundario" rotulo="Waze" onPress={() => { void irAteOLocal(os, 'waze'); }} />
+              </View>
+            </View>
+          </View>
+        )}
+
         <Cartao>
           <Linha rotulo="Cliente" valor={os.cliente.nome} />
           <Linha rotulo="Endereço" valor={os.endereco} />
@@ -141,6 +158,11 @@ export default function DetalheDaOS() {
           {os.checkin && <Linha rotulo="Check-in" valor={descreverMarcacao(os.checkin)} />}
           {os.conclusao && <Linha rotulo="Concluída" valor={descreverMarcacao(os.conclusao)} />}
         </Cartao>
+
+        {os.cliente.id > 0 && (
+          <Botao tipo="secundario" rotulo="Histórico deste local"
+            onPress={() => router.push({ pathname: '/local/[id]', params: { id: String(os.cliente.id) } })} />
+        )}
 
         <Secao titulo="O que fazer">
           <Text style={styles.descricao}>{os.descricao}</Text>
@@ -172,13 +194,22 @@ export default function DetalheDaOS() {
             {os.fotos.length > 0 && (
               <View style={styles.fotos}>
                 {os.fotos.map(f => (
-                  <Image key={f.id} source={{ uri: urlAbsoluta(f.url) }} style={styles.foto} accessibilityLabel={f.legenda} />
+                  <View key={f.id} style={{ gap: espaco[1] }}>
+                    <Image source={{ uri: urlAbsoluta(f.url) }} style={styles.foto} accessibilityLabel={f.legenda} />
+                    <Text style={styles.legenda} numberOfLines={1}>{f.legenda}</Text>
+                  </View>
                 ))}
               </View>
             )}
             {podeFotografar && (
-              <Botao tipo="secundario" rotulo={Platform.OS === 'web' ? 'Anexar foto' : 'Tirar foto'}
-                carregando={ocupado === 'foto'} desativado={!!ocupado} onPress={() => tirarFoto(os)} />
+              <View style={styles.dupla}>
+                {(['Antes', 'Depois'] as const).map(m => (
+                  <View key={m} style={{ flex: 1 }}>
+                    <Botao tipo="secundario" rotulo={`Foto ${m.toLowerCase()}`}
+                      carregando={ocupado === `foto-${m}`} desativado={!!ocupado} onPress={() => tirarFoto(os, m)} />
+                  </View>
+                ))}
+              </View>
             )}
           </Secao>
         )}
@@ -225,4 +256,6 @@ const criarEstilos = (c: Paleta) => StyleSheet.create({
   itemFeito: { color: c.textoSuave, textDecorationLine: 'line-through' },
   fotos: { flexDirection: 'row', flexWrap: 'wrap', gap: espaco[2] },
   foto: { width: 96, height: 96, borderRadius: raio.pequeno, backgroundColor: c.superficieForte },
+  legenda: { width: 96, fontFamily: fontes.texto, fontSize: corpo.micro, color: c.textoSuave },
+  dupla: { flexDirection: 'row', gap: espaco[2] },
 });

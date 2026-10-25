@@ -20,8 +20,9 @@ export interface RespostaDeLogin {
  *                            │ └──pausar──▶ ┘
  *                            └──concluir──▶ concluida
  * Cancelar é só do escritório (dash), nunca do técnico.
+ * solicitada = o técnico pediu a OS pelo app; espera o escritório aprovar (vira aberta).
  */
-export type Situacao = 'aberta' | 'andamento' | 'pausada' | 'concluida' | 'cancelada';
+export type Situacao = 'solicitada' | 'aberta' | 'andamento' | 'pausada' | 'concluida' | 'cancelada';
 
 export type Prioridade = 'baixa' | 'normal' | 'alta' | 'urgente';
 
@@ -73,6 +74,8 @@ export interface OrdemServico {
   /** o condomínio ou cliente atendido */
   cliente: Referencia;
   endereco: string;
+  /** ponto do condomínio no mapa (nulo = o cadastro não tem ponto: a rota usa o endereço) */
+  local?: { lat: number; lng: number } | null;
   tecnico: Referencia | null;
   /** datas em ISO 8601 */
   criada_em: string;
@@ -89,6 +92,7 @@ export interface OrdemServico {
 }
 
 export const ROTULO_SITUACAO: Record<Situacao, string> = {
+  solicitada: 'Esperando aprovação',
   aberta: 'Aberta',
   andamento: 'Em andamento',
   pausada: 'Pausada',

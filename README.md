@@ -30,6 +30,21 @@ o `eas.json` já põe nos builds). A API é um serviço separado no `cmport-syst
 O login é criado na dash (aba Técnicos) a partir de um funcionário, com senha provisória de 7
 dias; no primeiro acesso o app pede para criar a senha. A sessão renova sozinha por até 30 dias.
 
+## Em campo
+
+- **Meu dia**: na aba A fazer, as OS de hoje (com as atrasadas e as em atendimento), os
+  próximos dias e as sem data, com o progresso "Hoje: 2 de 5 feitas".
+- **Como chegar**: Google Maps ou Waze até o ponto do condomínio (ou pelo endereço).
+- **Fotos Antes / Depois**: o servidor carimba na imagem a OS, o momento, a data e o condomínio.
+- **Histórico do local** e **Pedir OS aqui**: o que já foi feito no condomínio e uma OS nova que
+  vai para o escritório aprovar ("Esperando aprovação").
+- **QR da etiqueta**: a dash imprime as etiquetas (`cmportos://local/<id>`); a câmera do celular
+  abre o app direto no local, ou "Ler QR do equipamento" na lista.
+- **Avisos**: OS nova, passada para você, remarcada ou cancelada. Para funcionar falta criar o
+  projeto no EAS (`eas init`, grava o `projectId` no app.json) e pôr o `google-services.json` do
+  Firebase do app novo; sem isso o app pula o registro e o resto funciona normal.
+- **Relato por voz**: pelo microfone do teclado do celular (a dica aparece no campo).
+
 ## Sem internet
 
 Tudo funciona sem sinal: a lista e cada OS ficam guardadas no celular (`lib/cache.ts`) e as

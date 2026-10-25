@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/70
 import { Tela } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { TemaProvider, useTema } from '@/contexts/TemaContext';
+import { registrarAvisos, useAvisoAbreOS } from '@/lib/avisos';
 import { vigiarConexao } from '@/lib/fila';
 import { temaEscuro } from '@/lib/tema';
 
@@ -19,7 +20,10 @@ function Rotas() {
   const { cores, modo } = useTema();
   // logado: a fila sobe quando a conexão volta e quando o app volta para a tela (sem consultar)
   const liberado = !!usuario && !usuario.trocarSenha;
-  useEffect(() => { if (liberado) vigiarConexao(); }, [liberado]);
+  useEffect(() => { if (liberado) { vigiarConexao(); void registrarAvisos(); } }, [liberado]);
+  // tocar no aviso de OS nova abre a OS
+  const router = useRouter();
+  useAvisoAbreOS(router, liberado);
   // se a fonte falhar, segue com a do sistema em vez de travar na espera
   const [fontesProntas, erroFontes] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold });
 
@@ -46,6 +50,8 @@ function Rotas() {
           <Stack.Screen name="(abas)" />
           <Stack.Screen name="os/[id]/index" />
           <Stack.Screen name="os/[id]/concluir" />
+          <Stack.Screen name="local/[id]" />
+          <Stack.Screen name="ler-qr" />
         </Stack.Protected>
         <Stack.Protected guard={!usuario}>
           <Stack.Screen name="login" />

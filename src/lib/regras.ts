@@ -17,6 +17,7 @@ export type Acao =
     };
 
 const ROTULO: Record<Situacao, string> = {
+  solicitada: 'esperando o escritório aprovar',
   aberta: 'aberta', andamento: 'em andamento', pausada: 'pausada', concluida: 'concluída', cancelada: 'cancelada',
 };
 
