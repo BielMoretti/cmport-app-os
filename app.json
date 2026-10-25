@@ -2,6 +2,7 @@
   "expo": {
     "name": "CMPort OS",
     "slug": "cmport-app-os",
+    "owner": "biel.pedretti",
     "scheme": "cmportos",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -22,11 +23,14 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "blockedPermissions": [
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "plugins": [
@@ -78,7 +82,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "cce445b1-75f1-454a-9976-1335f374356d"
+      }
     }
   }
 }
