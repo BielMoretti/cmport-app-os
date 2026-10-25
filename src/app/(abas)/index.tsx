@@ -23,11 +23,19 @@ const FILTROS: { valor: Filtro; rotulo: string }[] = [
 
 const mesmoDia = (iso: string, d: Date) => new Date(iso).toDateString() === d.toDateString();
 
+/** A parada desta OS na rota de hoje (só vale para OS agendada hoje: a rota é do dia). */
+function paradaDeHoje(os: OrdemServico, hoje = new Date()): number | null {
+  return os.rota_posicao && os.agendada_para && mesmoDia(os.agendada_para, hoje) ? os.rota_posicao : null;
+}
+
 /** Meu dia: o que é para hoje (inclui atrasadas e o que já está em atendimento), os próximos dias e sem data. */
 function separarMeuDia(abertas: OrdemServico[]) {
   const hoje = new Date();
   const fimDeHoje = new Date(hoje); fimDeHoje.setHours(23, 59, 59, 999);
   const deHoje = abertas.filter(o => o.situacao !== 'aberta' || (o.agendada_para && new Date(o.agendada_para) <= fimDeHoje));
+  // com rota mandada pelo escritório, "Hoje" segue a rota; o que não está nela vem depois, como antes
+  const comRota = deHoje.filter(o => paradaDeHoje(o, hoje) !== null).sort((a, b) => paradaDeHoje(a, hoje)! - paradaDeHoje(b, hoje)!);
+  if (comRota.length) deHoje.splice(0, deHoje.length, ...comRota, ...deHoje.filter(o => !comRota.includes(o)));
   const proximas = abertas.filter(o => !deHoje.includes(o) && o.agendada_para);
   const semData = abertas.filter(o => !deHoje.includes(o) && !o.agendada_para);
   return [
@@ -51,7 +59,7 @@ function LinhaDaOS({ os, pendentes }: { os: OrdemServico; pendentes: number }) {
   return (
     <Cartao onPress={() => router.push({ pathname: '/os/[id]', params: { id: String(os.id) } })} rotulo={`${os.numero}, ${os.titulo}`}>
       <View style={styles.linhaTopo}>
-        <Text style={styles.numero}>{os.numero}</Text>
+        <Text style={styles.numero}>{paradaDeHoje(os) ? `${paradaDeHoje(os)}ª parada · ` : ''}{os.numero}</Text>
         <SeloSituacao situacao={os.situacao} />
       </View>
       <Text style={styles.titulo} numberOfLines={2}>{os.titulo}</Text>

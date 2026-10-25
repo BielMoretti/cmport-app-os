@@ -100,6 +100,8 @@ export interface OrdemServico {
   relato: string;
   /** até quando concluir, pela prioridade (nulo = esperando aprovação) */
   prazo_em?: string | null;
+  /** posição na rota do dia que o escritório mandou (1 = a primeira) */
+  rota_posicao?: number | null;
   mensagens?: Mensagem[];
 }
 
