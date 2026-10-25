@@ -8,6 +8,7 @@ import { VerAssinatura } from '@/components/Assinatura';
 import { GravarAudio, TocarAudio } from '@/components/AudioDaOS';
 import AvisoDaFila from '@/components/AvisoDaFila';
 import Cronometro from '@/components/Cronometro';
+import MarcarFoto from '@/components/MarcarFoto';
 import { Aviso, Botao, Campo, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { urlAbsoluta } from '@/lib/config';
@@ -20,7 +21,7 @@ import {
   retomar,
 } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
-import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
+import { ROTULO_PRIORIDADE, type OrdemServico, type TracoNaFoto } from '@/lib/types';
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   const styles = useEstilos(criarEstilos);
@@ -75,6 +76,8 @@ export default function DetalheDaOS() {
     antes.current = daqui;
   }, [daqui, id]);
 
+  const [paraMarcar, setParaMarcar] = useState<{ uri: string; largura: number; altura: number; momento: 'Antes' | 'Depois' } | null>(null);
+
   async function agir(nome: string, acao: () => Promise<OrdemServico>) {
     setErro(null);
     setOcupado(nome);
@@ -98,9 +101,17 @@ export default function DetalheDaOS() {
     const r = Platform.OS === 'web' ? await ImagePicker.launchImageLibraryAsync(opcoes) : await ImagePicker.launchCameraAsync(opcoes);
     if (r.canceled || !r.assets[0]) return;
     const a = r.assets[0];
+    // antes de enviar, a tela de marcar na foto (pode enviar sem marcar)
+    setParaMarcar({ uri: a.uri, largura: a.width, altura: a.height, momento });
+  }
+
+  async function enviarFoto(tracos: TracoNaFoto[]) {
+    const f = paraMarcar;
+    setParaMarcar(null);
+    if (!f || !os) return;
     // reduz antes de subir (4 a 8 MB da câmera viram uns 300 KB): o servidor aceita até 3 MB
-    const n = atual.fotos.filter(f => f.legenda.startsWith(momento)).length + 1;
-    await agir(`foto-${momento}`, async () => anexarFoto(atual.id, await reduzirFoto(a.uri, a.width), `${momento} ${n}`));
+    const n = os.fotos.filter(x => x.legenda.startsWith(f.momento)).length + 1;
+    await agir(`foto-${f.momento}`, async () => anexarFoto(os.id, await reduzirFoto(f.uri, f.largura), `${f.momento} ${n}`, tracos));
   }
 
   if (!os) {
@@ -123,6 +134,9 @@ export default function DetalheDaOS() {
   return (
     <View style={{ flex: 1 }}>
       <Topo titulo={os.numero} />
+      {paraMarcar && (
+        <MarcarFoto foto={paraMarcar} aoEnviar={tracos => { void enviarFoto(tracos); }} aoCancelar={() => setParaMarcar(null)} />
+      )}
       <ScrollView contentContainerStyle={[styles.conteudo, { paddingBottom: margem.bottom + espaco[10] }]}>
         <View style={{ gap: espaco[2] }}>
           <SeloSituacao situacao={os.situacao} />

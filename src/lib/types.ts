@@ -40,6 +40,10 @@ export interface Marcacao {
   precisao: number | null;
 }
 
+/** Traço riscado pelo técnico na foto: pontos de 0 a 1 sobre a imagem (o servidor desenha). */
+export type CorDoTraco = 'vermelho' | 'amarelo' | 'branco';
+export interface TracoNaFoto { cor: CorDoTraco; pontos: [number, number][] }
+
 export interface ItemDoChecklist {
   id: number;
   texto: string;

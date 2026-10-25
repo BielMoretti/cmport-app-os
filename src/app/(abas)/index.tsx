@@ -14,10 +14,11 @@ import { listarOS, ordenarOS, quando } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, vidro, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
 
-type Filtro = 'abertas' | 'concluidas' | 'todas';
+type Filtro = 'abertas' | 'semana' | 'concluidas' | 'todas';
 
 const FILTROS: { valor: Filtro; rotulo: string }[] = [
   { valor: 'abertas', rotulo: 'A fazer' },
+  { valor: 'semana', rotulo: 'Semana' },
   { valor: 'concluidas', rotulo: 'Concluídas' },
   { valor: 'todas', rotulo: 'Todas' },
 ];
@@ -46,8 +47,24 @@ function separarMeuDia(abertas: OrdemServico[]) {
   ].filter(s => s.data.length > 0);
 }
 
+/** Os 7 dias a partir de hoje, com as OS abertas de cada um. Hoje inclui as atrasadas e o que já está em atendimento. */
+function semana(abertas: OrdemServico[]) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => {
+    const dia = new Date(hoje); dia.setDate(hoje.getDate() + i);
+    const fim = new Date(dia); fim.setHours(23, 59, 59, 999);
+    const lista = abertas.filter(o => (i === 0
+      ? o.situacao !== 'aberta' || (!!o.agendada_para && new Date(o.agendada_para) <= fim)
+      : o.situacao === 'aberta' && !!o.agendada_para && mesmoDia(o.agendada_para, dia)));
+    const curto = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : dia.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    const longo = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : dia.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+    return { i, numero: dia.getDate(), curto, longo: longo.charAt(0).toUpperCase() + longo.slice(1), lista };
+  });
+}
+
 function passaNoFiltro(os: OrdemServico, filtro: Filtro): boolean {
   if (filtro === 'todas') return true;
+  if (filtro === 'semana') return !(os.situacao === 'concluida' || os.situacao === 'cancelada');
   const feita = os.situacao === 'concluida' || os.situacao === 'cancelada';
   return filtro === 'concluidas' ? feita : !feita;
 }
@@ -95,6 +112,7 @@ export default function MinhasOS() {
   const [erro, setErro] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>('abertas');
+  const [diaEscolhido, setDiaEscolhido] = useState(0);
   const [semSinalDesde, setSemSinalDesde] = useState<string | null>(null);
   const fila = useFila();
 
@@ -128,7 +146,12 @@ export default function MinhasOS() {
   const visiveis = useMemo(() => (lista ?? []).filter(os => passaNoFiltro(os, filtro)), [lista, filtro]);
   const aFazer = useMemo(() => (lista ?? []).filter(os => passaNoFiltro(os, 'abertas')).length, [lista]);
   const primeiroNome = usuario?.nome.split(' ')[0] ?? '';
-  const secoes = useMemo(() => (filtro === 'abertas' ? separarMeuDia(visiveis) : [{ titulo: '', data: visiveis }]), [filtro, visiveis]);
+  const dias = useMemo(() => semana(visiveis), [visiveis]);
+  const secoes = useMemo(() => {
+    if (filtro === 'abertas') return separarMeuDia(visiveis);
+    if (filtro === 'semana') return [{ titulo: dias[diaEscolhido].longo, data: dias[diaEscolhido].lista }];
+    return [{ titulo: '', data: visiveis }];
+  }, [filtro, visiveis, dias, diaEscolhido]);
   // progresso do dia: as concluídas hoje contra o total de hoje
   const feitasHoje = useMemo(() => (lista ?? []).filter(o => o.concluida_em && mesmoDia(o.concluida_em, new Date())).length, [lista]);
   const totalHoje = feitasHoje + (secoes.find(s => s.titulo === 'Hoje')?.data.length ?? 0);
@@ -172,6 +195,31 @@ export default function MinhasOS() {
           );
         })}
       </ScrollView>
+      {filtro === 'semana' && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: espaco[2] }} accessibilityRole="tablist">
+          {dias.map(d => {
+            const ativo = d.i === diaEscolhido;
+            return (
+              <Pressable
+                key={d.i}
+                onPress={() => setDiaEscolhido(d.i)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: ativo }}
+                accessibilityLabel={`${d.longo}: ${d.lista.length === 1 ? '1 OS' : `${d.lista.length} OS`}`}
+                style={[styles.dia, ativo ? { backgroundColor: cores.azul, borderColor: cores.azul } : vidro(cores)]}
+              >
+                <Text style={[styles.diaCurto, ativo && { color: cores.sobreAzul }]}>{d.curto}</Text>
+                <Text style={[styles.diaNumero, ativo && { color: cores.sobreAzul }]}>{d.numero}</Text>
+                <View style={[styles.diaConta, { backgroundColor: d.lista.length ? (ativo ? cores.sobreAzul : cores.azulSuave) : 'transparent' }]}>
+                  <Text style={[styles.diaContaTexto, { color: ativo ? cores.azul : d.lista.length ? cores.azul : cores.textoSuave }]}>
+                    {d.lista.length || 'livre'}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
       {Platform.OS !== 'web' || __DEV__ ? (
         <Pressable onPress={() => router.push('/ler-qr')} accessibilityRole="button" style={[styles.chip, vidro(cores), { alignSelf: 'flex-start' }]}>
           <Text style={styles.chipTexto}>Ler QR do equipamento</Text>
@@ -210,6 +258,8 @@ export default function MinhasOS() {
       }}
       ListHeaderComponent={cabecalho}
       ListEmptyComponent={lista ? <Text style={styles.vazio}>Nenhuma OS aqui.</Text> : null}
+      renderSectionFooter={({ section }) => (filtro === 'semana' && section.data.length === 0
+        ? <Text style={styles.vazio}>Nenhuma OS neste dia.</Text> : null)}
       ItemSeparatorComponent={() => <View style={{ height: espaco[3] }} />}
       refreshControl={<RefreshControl refreshing={atualizando} onRefresh={puxar} tintColor={cores.azul} />}
       contentContainerStyle={[styles.conteudo, { paddingTop: margem.top + espaco[6], paddingBottom: componentes.abas.reserva + margem.bottom }]}
@@ -236,6 +286,11 @@ const criarEstilos = (c: Paleta) => StyleSheet.create({
   vazio: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.textoSuave, textAlign: 'center', paddingVertical: espaco[10] },
   secao: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.textoSuave, textTransform: 'uppercase', letterSpacing: 0.6,
     paddingTop: espaco[4], paddingBottom: espaco[2] },
+  dia: { width: 64, paddingVertical: espaco[2.5], borderRadius: componentes.cartao.raio - 8, alignItems: 'center', gap: espaco[0.5], borderWidth: 1 },
+  diaCurto: { fontFamily: fontes.textoForte, fontSize: corpo.micro, color: c.textoSuave, textTransform: 'capitalize' },
+  diaNumero: { fontFamily: fontes.nome, fontSize: corpo.cabecalho, color: c.texto, fontVariant: ['tabular-nums'] },
+  diaConta: { minWidth: 26, paddingHorizontal: espaco[1.5], borderRadius: raio.pilula, alignItems: 'center' },
+  diaContaTexto: { fontFamily: fontes.textoForte, fontSize: corpo.micro },
   progressoTexto: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.texto },
   trilho: { height: 6, borderRadius: raio.pilula, backgroundColor: c.superficieForte, overflow: 'hidden' },
   barra: { position: 'absolute', left: 0, top: 0, height: 6, borderRadius: raio.pilula, backgroundColor: c.concluida.texto },

@@ -25,7 +25,7 @@ import { apagarRascunhos } from './rascunho';
 import { demo } from './demo';
 import { apagarFila, carregarFila, enfileirar, itensDaFila, sincronizar } from './fila';
 import { aplicar, novaIdentidade, type Acao } from './regras';
-import type { Marcacao, OrdemServico, Situacao } from './types';
+import type { Marcacao, OrdemServico, Situacao, TracoNaFoto } from './types';
 
 export { pendenciasParaConcluir } from './regras';
 
@@ -124,11 +124,12 @@ export function marcarItem(id: number, item: number, feito: boolean): Promise<Or
   return agir({ tipo: 'item', os: id, item, feito, em: agora() });
 }
 
-export async function anexarFoto(id: number, arquivo: { uri: string; nome: string; tipo: string }, legenda: string): Promise<OrdemServico> {
+export async function anexarFoto(id: number, arquivo: { uri: string; nome: string; tipo: string }, legenda: string,
+  marcacoes?: TracoNaFoto[]): Promise<OrdemServico> {
   const idCliente = novaIdentidade('f');
   // a foto espera sinal num lugar que sobrevive ao app fechar
   const uri = MODO_DEMO ? arquivo.uri : await guardarFotoDaFila(arquivo.uri, idCliente);
-  return agir({ tipo: 'foto', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, legenda });
+  return agir({ tipo: 'foto', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, legenda, marcacoes });
 }
 
 /** Áudio na OS: o arquivo espera sinal nos documentos do app, como a foto. */
