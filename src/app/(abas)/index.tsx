@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlifoLocal, GlifoRelogio } from '@/components/arte';
 import AvisoDaFila, { MarcaPendente } from '@/components/AvisoDaFila';
-import { Aviso, Carregando, Cartao, SeloSituacao, Tela } from '@/components/ui';
+import { Esqueleto, Surgir, useProgresso } from '@/components/movimento';
+import { Aviso, Cartao, LogoPlaca, SeloSituacao, Tela } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { pendentesDaOS, useFila } from '@/lib/fila';
 import { listarOS, ordenarOS, quando } from '@/lib/os';
-import { componentes, corpo, espaco, fontes, vidro, type Paleta } from '@/lib/tema';
+import { componentes, corpo, espaco, fontes, raio, vidro, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
 
 type Filtro = 'abertas' | 'concluidas' | 'todas';
@@ -131,20 +132,27 @@ export default function MinhasOS() {
   // progresso do dia: as concluídas hoje contra o total de hoje
   const feitasHoje = useMemo(() => (lista ?? []).filter(o => o.concluida_em && mesmoDia(o.concluida_em, new Date())).length, [lista]);
   const totalHoje = feitasHoje + (secoes.find(s => s.titulo === 'Hoje')?.data.length ?? 0);
+  const larguraDaBarra = useProgresso(totalHoje ? feitasHoje / totalHoje : 0);
+  // a cascata de entrada é só da primeira carga; ao trocar de filtro ou atualizar, a lista já está ali
+  const [cascata, setCascata] = useState(true);
+  useEffect(() => { if (lista) { const t = setTimeout(() => setCascata(false), 900); return () => clearTimeout(t); } }, [lista]);
 
   const cabecalho = (
     <View style={{ gap: espaco[4], paddingBottom: espaco[2] }}>
-      <View style={{ gap: espaco[1] }}>
-        <Text style={styles.ola}>Olá, {primeiroNome}</Text>
-        <Text style={styles.resumo} accessibilityRole="header">
-          {lista === null ? 'Carregando…' : aFazer === 0 ? 'Nada pendente' : aFazer === 1 ? '1 OS a fazer' : `${aFazer} OS a fazer`}
-        </Text>
+      <View style={styles.saudacao}>
+        <View style={{ gap: espaco[1], flex: 1 }}>
+          <Text style={styles.ola}>Olá, {primeiroNome}</Text>
+          <Text style={styles.resumo} accessibilityRole="header">
+            {lista === null ? 'Carregando…' : aFazer === 0 ? 'Nada pendente' : aFazer === 1 ? '1 OS a fazer' : `${aFazer} OS a fazer`}
+          </Text>
+        </View>
+        <LogoPlaca tamanho={componentes.logoPlaca.topo} />
       </View>
       {filtro === 'abertas' && totalHoje > 0 && (
         <View style={{ gap: espaco[1.5] }} accessibilityLabel={`Hoje: ${feitasHoje} de ${totalHoje} feitas`}>
           <Text style={styles.progressoTexto}>Hoje: {feitasHoje} de {totalHoje} {totalHoje === 1 ? 'feita' : 'feitas'}</Text>
           <View style={styles.trilho}>
-            <View style={[styles.barra, { width: `${Math.round((100 * feitasHoje) / totalHoje)}%` }]} />
+            <Animated.View style={[styles.barra, { width: larguraDaBarra }]} />
           </View>
         </View>
       )}
@@ -178,7 +186,16 @@ export default function MinhasOS() {
   );
 
   // a <Tela> (fundo opaco) é da própria aba: sem ela, a aba de onde se saiu aparecia por baixo
-  if (lista === null && !erro) return <Tela><Carregando /></Tela>;
+  if (lista === null && !erro) {
+    return (
+      <Tela>
+        <View style={[styles.conteudo, { paddingTop: margem.top + espaco[6], gap: espaco[3] }]} accessibilityLabel="Carregando as OS">
+          {cabecalho}
+          {[0, 1, 2].map(i => <Esqueleto key={i} cor={cores.superficieForte} altura={132} style={{ borderRadius: componentes.cartao.raio }} />)}
+        </View>
+      </Tela>
+    );
+  }
 
   return (
     <Tela>
@@ -187,7 +204,10 @@ export default function MinhasOS() {
       keyExtractor={os => String(os.id)}
       stickySectionHeadersEnabled={false}
       renderSectionHeader={({ section }) => (section.titulo ? <Text style={styles.secao}>{section.titulo}</Text> : null)}
-      renderItem={({ item }) => <LinhaDaOS os={item} pendentes={pendentesDaOS(fila.itens, item.id)} />}
+      renderItem={({ item, index }) => {
+        const linha = <LinhaDaOS os={item} pendentes={pendentesDaOS(fila.itens, item.id)} />;
+        return cascata && index < 6 ? <Surgir atraso={60 * index}>{linha}</Surgir> : linha;
+      }}
       ListHeaderComponent={cabecalho}
       ListEmptyComponent={lista ? <Text style={styles.vazio}>Nenhuma OS aqui.</Text> : null}
       ItemSeparatorComponent={() => <View style={{ height: espaco[3] }} />}
@@ -200,6 +220,7 @@ export default function MinhasOS() {
 
 const criarEstilos = (c: Paleta) => StyleSheet.create({
   conteudo: { paddingHorizontal: componentes.tela.margem, width: '100%', maxWidth: componentes.conteudo.larguraMaxima, alignSelf: 'center' },
+  saudacao: { flexDirection: 'row', alignItems: 'center', gap: espaco[3] },
   ola: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.textoSuave },
   resumo: { fontFamily: fontes.nome, fontSize: corpo.titulo, color: c.texto },
   chip: { height: componentes.chip.altura, borderRadius: componentes.chip.raio, paddingHorizontal: componentes.chip.respiroH, justifyContent: 'center', borderWidth: 1 },
@@ -216,6 +237,6 @@ const criarEstilos = (c: Paleta) => StyleSheet.create({
   secao: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.textoSuave, textTransform: 'uppercase', letterSpacing: 0.6,
     paddingTop: espaco[4], paddingBottom: espaco[2] },
   progressoTexto: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.texto },
-  trilho: { height: 6, borderRadius: 3, backgroundColor: c.superficieForte, overflow: 'hidden' },
-  barra: { height: 6, borderRadius: 3, backgroundColor: c.concluida.texto },
+  trilho: { height: 6, borderRadius: raio.pilula, backgroundColor: c.superficieForte, overflow: 'hidden' },
+  barra: { position: 'absolute', left: 0, top: 0, height: 6, borderRadius: raio.pilula, backgroundColor: c.concluida.texto },
 });

@@ -82,6 +82,10 @@ export interface Paleta {
   superficieForte: string;
   vidroBorda: string;
   vidroSombra: string;
+  /** fio de luz no topo dos painéis: é o que faz o painel ler como vidro */
+  vidroFio: string;
+  /** placa clara atrás da logo (o leão é cinza: precisa de fundo claro nos dois temas) */
+  placa: string;
   flutuante: string;
   ciano: string;
   texto: string;
@@ -111,6 +115,8 @@ export const paletas: Record<Modo, Paleta> = {
     superficieForte: vidroCru.claro.forte,
     vidroBorda: vidroCru.claro.borda,
     vidroSombra: vidroCru.claro.sombra,
+    vidroFio: cor.branco,
+    placa: cor.branco,
     flutuante: vidroCru.claro.flutuante,
     ciano: cor.ciano600,
     texto: cor.marinho900,
@@ -137,6 +143,8 @@ export const paletas: Record<Modo, Paleta> = {
     superficieForte: vidroCru.escuro.forte,
     vidroBorda: vidroCru.escuro.borda,
     vidroSombra: vidroCru.escuro.sombra,
+    vidroFio: 'rgba(200, 220, 255, 0.32)',
+    placa: cor.gelo50,
     flutuante: vidroCru.escuro.flutuante,
     ciano: cor.ciano400,
     texto: cor.gelo50,
@@ -188,5 +196,6 @@ export const componentes = {
   selo: { raio: raio.pilula, ponto: 8 },
   abas: { altura: 68, icone: 22, margem: espaco[4], reserva: 124, larguraMaxima: 480 },
   conteudo: { larguraMaxima: 560 },
+  logoPlaca: { topo: 44, entrada: 112 },
   tela: { margem: espaco[4], larguraMaxFormulario: 440 },
 } as const;

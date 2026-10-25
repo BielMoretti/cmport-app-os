@@ -1,10 +1,11 @@
 /** Peças básicas da interface. Cores sempre da paleta do tema; medidas de lib/tema. */
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlifoVoltar } from '@/components/arte';
+import { Pulso } from '@/components/movimento';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { aceso, componentes, corpo, espaco, fontes, raio, vidro, type Paleta } from '@/lib/tema';
 import { ROTULO_SITUACAO, type Situacao } from '@/lib/types';
@@ -15,6 +16,22 @@ export function Tela({ children }: { children: ReactNode }) {
   const degrade = `linear-gradient(180deg, ${cores.fundoAlto} 0%, ${cores.fundo} 55%)`;
   const fundo = (Platform.OS === 'web' ? { backgroundImage: degrade } : { experimental_backgroundImage: degrade }) as ViewStyle;
   return <View style={[{ flex: 1, backgroundColor: cores.fundo }, fundo]}>{children}</View>;
+}
+
+/** A logo da CM Port numa placa clara (o leão é cinza: some no fundo escuro sem ela). */
+export function LogoPlaca({ tamanho, completo = false }: { tamanho: number; completo?: boolean }) {
+  const styles = useEstilos(criarEstilos);
+  return (
+    <View style={[styles.logoPlaca, { width: tamanho, height: tamanho, borderRadius: tamanho * 0.3, padding: tamanho * 0.12 }]}>
+      <Image
+        source={completo ? require('../../assets/logo.png') : require('../../assets/leao.png')}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="contain"
+        accessibilityLabel="CM Port"
+        accessibilityIgnoresInvertColors
+      />
+    </View>
+  );
 }
 
 /** Topo de uma tela de detalhe: voltar + título. */
@@ -80,14 +97,17 @@ export function Campo({ rotulo, ...props }: TextInputProps & { rotulo: string })
 export function Cartao({ children, onPress, rotulo }: { children: ReactNode; onPress?: () => void; rotulo?: string }) {
   const styles = useEstilos(criarEstilos);
   const { cores } = useTema();
-  if (!onPress) return <View style={[styles.cartao, vidro(cores)]}>{children}</View>;
+  // o fio de luz no topo é o que faz o painel ler como vidro
+  const fio = <View style={styles.fio} pointerEvents="none" />;
+  if (!onPress) return <View style={[styles.cartao, vidro(cores)]}>{fio}{children}</View>;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={rotulo}
-      style={({ pressed }) => [styles.cartao, vidro(cores), pressed && { transform: [{ scale: 0.98 }] }]}
+      style={({ pressed }) => [styles.cartao, vidro(cores), pressed && styles.cartaoApertado]}
     >
+      {fio}
       {children}
     </Pressable>
   );
@@ -100,7 +120,9 @@ export function SeloSituacao({ situacao }: { situacao: Situacao }) {
   const c = cores[situacao];
   return (
     <View style={[styles.selo, { backgroundColor: c.fundo }]}>
-      <View style={[styles.seloPonto, { backgroundColor: c.texto }]} />
+      {situacao === 'andamento'
+        ? <Pulso cor={c.texto} tamanho={componentes.selo.ponto} />
+        : <View style={[styles.seloPonto, { backgroundColor: c.texto }]} />}
       <Text style={[styles.seloTexto, { color: c.texto }]}>{ROTULO_SITUACAO[situacao]}</Text>
     </View>
   );
@@ -139,7 +161,10 @@ const criarEstilos = (c: Paleta) => StyleSheet.create({
     ...vidro(c), borderRadius: componentes.campo.raio, paddingHorizontal: componentes.campo.respiroH,
     paddingVertical: componentes.campo.respiroV, fontFamily: fontes.texto, fontSize: corpo.base, color: c.texto,
   },
-  cartao: { borderRadius: componentes.cartao.raio, padding: componentes.cartao.respiro, gap: espaco[2.5] },
+  cartao: { borderRadius: componentes.cartao.raio, padding: componentes.cartao.respiro, gap: espaco[2.5], boxShadow: c.vidroSombra },
+  cartaoApertado: { transform: [{ scale: 0.98 }], borderColor: c.azul, boxShadow: c.brilho },
+  fio: { position: 'absolute', top: 0, left: raio.grande, right: raio.grande, height: 1, backgroundColor: c.vidroFio },
+  logoPlaca: { backgroundColor: c.placa, borderWidth: 1, borderColor: c.vidroFio, boxShadow: c.brilho },
   selo: { flexDirection: 'row', alignItems: 'center', gap: espaco[1.5], alignSelf: 'flex-start', borderRadius: componentes.selo.raio, paddingHorizontal: espaco[2.5], paddingVertical: espaco[1] },
   seloPonto: { width: componentes.selo.ponto, height: componentes.selo.ponto, borderRadius: raio.pilula },
   seloTexto: { fontFamily: fontes.textoForte, fontSize: corpo.micro },

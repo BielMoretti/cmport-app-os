@@ -8,16 +8,16 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://dash.cmport.com.br/api/tecnico/v1" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://tec.cmport.com.br/api/tecnico/v1" }
     },
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://dash.cmport.com.br/api/tecnico/v1" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://tec.cmport.com.br/api/tecnico/v1" }
     },
     "production": {
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_API_URL": "https://dash.cmport.com.br/api/tecnico/v1" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://tec.cmport.com.br/api/tecnico/v1" }
     }
   },
   "submit": {

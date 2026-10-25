@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Aviso, Botao, Campo } from '@/components/ui';
+import { Surgir } from '@/components/movimento';
+import { Aviso, Botao, Campo, LogoPlaca, Tela } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstilos } from '@/contexts/TemaContext';
 import { MODO_DEMO } from '@/lib/config';
@@ -30,17 +31,21 @@ export default function Login() {
   }
 
   return (
+    <Tela>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={[styles.conteudo, { paddingTop: margem.top + espaco[12], paddingBottom: margem.bottom + espaco[8] }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.formulario}>
-          <View style={{ gap: espaco[2] }}>
-            <Text style={styles.marca}>CMPort OS</Text>
-            <Text style={styles.titulo} accessibilityRole="header">Entrar</Text>
+          <Surgir distancia={0} escala={0.92} style={styles.marcaArea}>
+            <LogoPlaca tamanho={componentes.logoPlaca.entrada} completo />
+          </Surgir>
+          <Surgir atraso={140} style={{ gap: espaco[2], alignItems: 'center' }}>
+            <Text style={styles.titulo} accessibilityRole="header">CMPort OS</Text>
             <Text style={styles.sub}>Suas ordens de serviço do dia, no bolso.</Text>
-          </View>
+          </Surgir>
+          <Surgir atraso={260} style={{ gap: espaco[5] }}>
 
           {MODO_DEMO && <Aviso tipo="info" texto="Modo demonstração: qualquer e-mail e senha entram. As OS são exemplos." />}
 
@@ -68,16 +73,18 @@ export default function Login() {
           {erro && <Aviso texto={erro} />}
 
           <Botao rotulo="Entrar" onPress={entrar} carregando={entrando} />
+          </Surgir>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </Tela>
   );
 }
 
 const criarEstilos = (c: Paleta) => StyleSheet.create({
   conteudo: { flexGrow: 1, paddingHorizontal: componentes.tela.margem, alignItems: 'center' },
   formulario: { width: '100%', maxWidth: componentes.tela.larguraMaxFormulario, gap: espaco[5] },
-  marca: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.azul, letterSpacing: 1 },
-  titulo: { fontFamily: fontes.nome, fontSize: corpo.destaque, color: c.texto },
-  sub: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.textoSuave },
+  marcaArea: { alignItems: 'center' },
+  titulo: { fontFamily: fontes.nome, fontSize: corpo.destaque, color: c.texto, textAlign: 'center' },
+  sub: { fontFamily: fontes.texto, fontSize: corpo.base, color: c.textoSuave, textAlign: 'center' },
 });
