@@ -1,0 +1,101 @@
+# Gera o app Android nos computadores do GitHub (de graça), sem gastar a cota de builds do Expo.
+# Usa o mesmo eas.json e as mesmas chaves de assinatura guardadas no Expo (EAS "local build").
+#
+# Como usar: aba Actions > "Gerar app Android" > Run workflow > escolher o perfil.
+#   production = .aab para enviar à Play Store
+#   preview    = .apk para instalar direto no celular
+# O arquivo fica para baixar no fim da execução (Artifacts), por 14 dias.
+#
+# Precisa do segredo EXPO_TOKEN (Settings > Secrets and variables > Actions), criado em
+# expo.dev > Account settings > Access tokens.
+name: Gerar app Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      perfil:
+        description: "production (.aab para a Play Store) ou preview (.apk para instalar)"
+        required: true
+        default: production
+        type: choice
+        options: [production, preview]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # só celulares de verdade (ARM): menos espaço e tempo; a Play Store não exige x86
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a
+    steps:
+      # o disco do GitHub (~14 GB livres) não basta para o build do React Native: tira o que o app não usa
+      - name: Libera espaço em disco
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/PyPy /opt/hostedtoolcache/go \
+            /usr/local/share/powershell /usr/local/share/chromium /usr/local/julia* || true
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      # o Android SDK já vem instalado nos computadores do GitHub (ANDROID_HOME)
+      - name: Confere o Android SDK
+        run: echo "Android SDK em $ANDROID_HOME" && ls "$ANDROID_HOME"
+
+      - name: Confere o segredo do Expo
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Falta o segredo EXPO_TOKEN em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      # a trava de dependências foi feita com o npm 10 (o 11 recusa a mesma trava)
+      - name: Instala as dependências
+        run: npx --yes npm@10.9.8 ci
+
+      - name: Gera o app
+        run: |
+          if [ "${{ inputs.perfil }}" = "production" ]; then EXT=aab; else EXT=apk; fi
+          mkdir -p saida
+          npx --yes eas-cli@latest build --platform android --profile "${{ inputs.perfil }}" \
+            --local --non-interactive --output "saida/cmport-os-${{ inputs.perfil }}.$EXT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cmport-os-${{ inputs.perfil }}
+          path: saida/*
+          retention-days: 14
+
+      # APK de teste num link público e fixo, para abrir no celular e já baixar:
+      #   https://github.com/BielMoretti/cmport-app-apk/releases/download/teste/cmport.apk
+      # Precisa do segredo APK_TOKEN (token do GitHub com permissão de escrita só no cmport-app-apk).
+      - name: Publica o APK no link de teste
+        if: inputs.perfil == 'preview'
+        env:
+          GH_TOKEN: ${{ secrets.APK_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Falta o segredo APK_TOKEN: o APK ficou só nos Artifacts."
+            exit 0
+          fi
+          R=BielMoretti/cmport-app-apk
+          VERSAO=$(node -p "require('./app.json').expo.version")
+          cp saida/cmport-preview.apk saida/cmport.apk
+          if ! gh release view teste -R "$R" > /dev/null 2>&1; then
+            gh release create teste -R "$R" --title "APK de teste" --notes "Versão mais nova para testar."
+          fi
+          gh release upload teste saida/cmport.apk -R "$R" --clobber
+          gh release edit teste -R "$R" --notes "Versão $VERSAO, gerada em $(date -u '+%d/%m/%Y %H:%M') UTC a partir de ${GITHUB_SHA::7}."
