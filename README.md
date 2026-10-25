@@ -30,6 +30,24 @@ o `eas.json` já põe nos builds). A API é um serviço separado no `cmport-syst
 O login é criado na dash (aba Técnicos) a partir de um funcionário, com senha provisória de 7
 dias; no primeiro acesso o app pede para criar a senha. A sessão renova sozinha por até 30 dias.
 
+## Sem internet
+
+Tudo funciona sem sinal: a lista e cada OS ficam guardadas no celular (`lib/cache.ts`) e as
+ações entram numa fila (`lib/fila.ts`) com a hora em que aconteceram. A tela já mostra a OS como
+vai ficar (`lib/regras.ts`, as mesmas regras do servidor) e avisa "N ações guardadas no celular".
+A fila sobe sozinha, na ordem, quando o celular avisa que a conexão voltou ou quando o app volta
+para a tela. Foto da fila fica nos documentos do app até subir e leva uma identidade, para o
+servidor não gravar duas vezes. Ação recusada (ex.: o escritório cancelou a OS) aparece com o
+motivo e os botões Tentar de novo / Descartar; as das outras OS continuam subindo. Sair da conta
+com ação pendente avisa antes, porque apaga o que está no celular.
+
+## Bateria
+
+- GPS só no check-in e na conclusão: usa a última posição que o celular já sabe (até 2 min) e,
+  se não houver, uma leitura na precisão "equilibrada", com no máximo 12 s. Nunca em segundo plano.
+- Nada fica consultando o servidor: a lista atualiza ao abrir a aba ou puxar, a fila só tenta
+  quando a conexão volta. Fotos reduzidas antes de subir. Tema escuro por padrão.
+
 ## Onde fica cada coisa
 
 | Arquivo | O quê |
@@ -47,6 +65,6 @@ dias; no primeiro acesso o app pede para criar a senha. A sessão renova sozinha
 
 ## Próximos passos
 
-- Funcionar sem sinal (guardar as ações e enviar quando a internet voltar).
+- Medir o gasto de bateria num Android real (1 h de uso) e comparar com o Auvo.
 - Relatório de atendimento (e-mail aos condomínios) lendo também estas OS.
 - Ícone e nome próprios na loja; build pelo EAS só quando for pedido.

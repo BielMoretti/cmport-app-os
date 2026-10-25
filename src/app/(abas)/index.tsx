@@ -1,12 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlifoLocal, GlifoRelogio } from '@/components/arte';
+import AvisoDaFila, { MarcaPendente } from '@/components/AvisoDaFila';
 import { Aviso, Carregando, Cartao, SeloSituacao, Tela } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
+import { pendentesDaOS, useFila } from '@/lib/fila';
 import { listarOS, ordenarOS, quando } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, vidro, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
@@ -25,7 +27,7 @@ function passaNoFiltro(os: OrdemServico, filtro: Filtro): boolean {
   return filtro === 'concluidas' ? feita : !feita;
 }
 
-function LinhaDaOS({ os }: { os: OrdemServico }) {
+function LinhaDaOS({ os, pendentes }: { os: OrdemServico; pendentes: number }) {
   const styles = useEstilos(criarEstilos);
   const { cores } = useTema();
   const router = useRouter();
@@ -53,6 +55,7 @@ function LinhaDaOS({ os }: { os: OrdemServico }) {
           Prioridade {ROTULO_PRIORIDADE[os.prioridade].toLowerCase()}
         </Text>
       )}
+      <MarcaPendente quantas={pendentes} />
     </Cartao>
   );
 }
@@ -66,11 +69,15 @@ export default function MinhasOS() {
   const [erro, setErro] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>('abertas');
+  const [semSinalDesde, setSemSinalDesde] = useState<string | null>(null);
+  const fila = useFila();
 
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      setLista(ordenarOS(await listarOS()));
+      const r = await listarOS();
+      setLista(ordenarOS(r.lista));
+      setSemSinalDesde(r.semSinalDesde);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível carregar as OS.');
     }
@@ -78,6 +85,13 @@ export default function MinhasOS() {
 
   // busca de novo sempre que a aba aparece: a OS aberta ou mudada na dash chega sem puxar a lista
   useFocusEffect(useCallback(() => { void carregar(); }, [carregar]));
+
+  // a fila terminou de subir alguma ação: a lista passa a mostrar a versão do servidor
+  const naFila = useRef(fila.itens.length);
+  useEffect(() => {
+    if (fila.itens.length < naFila.current) void carregar();
+    naFila.current = fila.itens.length;
+  }, [fila.itens.length, carregar]);
 
   async function puxar() {
     setAtualizando(true);
@@ -113,6 +127,10 @@ export default function MinhasOS() {
           );
         })}
       </ScrollView>
+      <AvisoDaFila />
+      {semSinalDesde && (
+        <Aviso tipo="info" texto={`Sem sinal: mostrando a lista guardada às ${new Date(semSinalDesde).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`} />
+      )}
       {erro && <Aviso texto={erro} />}
     </View>
   );
@@ -125,7 +143,7 @@ export default function MinhasOS() {
     <FlatList
       data={visiveis}
       keyExtractor={os => String(os.id)}
-      renderItem={({ item }) => <LinhaDaOS os={item} />}
+      renderItem={({ item }) => <LinhaDaOS os={item} pendentes={pendentesDaOS(fila.itens, item.id)} />}
       ListHeaderComponent={cabecalho}
       ListEmptyComponent={lista ? <Text style={styles.vazio}>Nenhuma OS aqui.</Text> : null}
       ItemSeparatorComponent={() => <View style={{ height: espaco[3] }} />}

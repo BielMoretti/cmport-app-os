@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,11 +11,15 @@ import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/70
 import { Tela } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { TemaProvider, useTema } from '@/contexts/TemaContext';
+import { vigiarConexao } from '@/lib/fila';
 import { temaEscuro } from '@/lib/tema';
 
 function Rotas() {
   const { usuario, carregando } = useAuth();
   const { cores, modo } = useTema();
+  // logado: a fila sobe quando a conexão volta e quando o app volta para a tela (sem consultar)
+  const liberado = !!usuario && !usuario.trocarSenha;
+  useEffect(() => { if (liberado) vigiarConexao(); }, [liberado]);
   // se a fonte falhar, segue com a do sistema em vez de travar na espera
   const [fontesProntas, erroFontes] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold });
 

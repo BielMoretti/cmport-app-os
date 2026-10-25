@@ -1,16 +1,18 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VerAssinatura } from '@/components/Assinatura';
+import AvisoDaFila from '@/components/AvisoDaFila';
 import { Aviso, Botao, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { urlAbsoluta } from '@/lib/config';
+import { useFila } from '@/lib/fila';
 import { reduzirFoto } from '@/lib/foto';
 import { descreverMarcacao, marcarAqui } from '@/lib/local';
-import { anexarFoto, buscarOS, fazerCheckin, marcarItem, pausar, pendenciasParaConcluir, quando, retomar } from '@/lib/os';
+import { anexarFoto, buscarOS, fazerCheckin, marcarItem, osNoCelular, pausar, pendenciasParaConcluir, quando, retomar } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
 import { ROTULO_PRIORIDADE, type OrdemServico } from '@/lib/types';
 
@@ -56,6 +58,15 @@ export default function DetalheDaOS() {
       .catch(e => { if (!cancelado) setErro(e instanceof Error ? e.message : 'Não foi possível abrir a OS.'); });
     return () => { cancelado = true; };
   }, [id]));
+
+  // a fila subiu (ou recusou) uma ação desta OS: mostra a versão nova, sem ir ao servidor
+  const { itens } = useFila();
+  const daqui = itens.filter(i => i.acao.os === Number(id)).length;
+  const antes = useRef(daqui);
+  useEffect(() => {
+    if (daqui !== antes.current) void osNoCelular(Number(id)).then(o => { if (o) setOs(o); });
+    antes.current = daqui;
+  }, [daqui, id]);
 
   async function agir(nome: string, acao: () => Promise<OrdemServico>) {
     setErro(null);
@@ -107,6 +118,7 @@ export default function DetalheDaOS() {
         </View>
 
         {erro && <Aviso texto={erro} />}
+        <AvisoDaFila osId={os.id} />
 
         {/* a ação principal de cada momento fica no topo */}
         {os.situacao === 'aberta' && (

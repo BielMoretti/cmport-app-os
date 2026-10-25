@@ -1,24 +1,85 @@
 /**
- * Ordens de serviço: leitura e as ações do técnico. No modo demonstração muda os dados
- * de exemplo em memória; com a API definida, chama o backend próprio:
+ * Ordens de serviço no app — sempre "do celular primeiro", para funcionar sem internet:
  *
- *   GET   /os                         lista do técnico logado
- *   GET   /os/{id}                    uma OS
- *   POST  /os/{id}/checkin            { lat, lng, precisao }       aberta → andamento
- *   POST  /os/{id}/pausar                                          andamento → pausada
- *   POST  /os/{id}/retomar                                         pausada → andamento
- *   PATCH /os/{id}/checklist/{item}   { feito }
- *   POST  /os/{id}/fotos              multipart: arquivo + legenda
- *   POST  /os/{id}/concluir           { relato, assinatura, lat, lng, precisao }
+ *   ler    tenta o servidor e guarda (lib/cache.ts); sem sinal, usa o que está guardado. Por cima
+ *          vão as ações ainda na fila, para a tela mostrar a OS como ela vai ficar.
+ *   agir   confere a regra aqui mesmo (lib/regras.ts), põe a ação na fila (lib/fila.ts) com a
+ *          hora em que aconteceu e tenta subir. A tela recebe a OS já atualizada na hora.
  *
- * Toda ação devolve a OS inteira atualizada: a tela troca a que tem pela que voltou.
+ * Rotas do backend próprio (serviço dos técnicos, /api/tecnico/v1):
+ *   GET   /os · GET /os/{id}
+ *   POST  /os/{id}/checkin {em, lat, lng, precisao} · /pausar {em} · /retomar {em}
+ *   PATCH /os/{id}/checklist/{item} {feito, em}
+ *   POST  /os/{id}/fotos (multipart: arquivo, legenda, em, id_cliente)
+ *   POST  /os/{id}/concluir {em, relato, assinatura, lat, lng, precisao}
+ *
+ * No MODO_DEMO não há servidor nem fila: as mesmas regras mudam os dados de exemplo.
  */
-import { api, ApiError, enviarArquivo } from './api';
+import { api, ApiError } from './api';
+import { guardarFotoDaFila } from './arquivoDaFila';
+import { apagarCache, guardarLista, guardarOS, listaGuardada, osGuardada } from './cache';
 import { MODO_DEMO } from './config';
 import { demo } from './demo';
+import { apagarFila, carregarFila, enfileirar, itensDaFila, sincronizar } from './fila';
+import { aplicar, novaIdentidade, type Acao } from './regras';
 import type { Marcacao, OrdemServico, Situacao } from './types';
 
+export { pendenciasParaConcluir } from './regras';
+
 const espera = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** As ações ainda na fila, aplicadas por cima da versão que veio do servidor. */
+function comPendentes(os: OrdemServico): OrdemServico {
+  let atual = os;
+  for (const item of itensDaFila()) {
+    if (item.acao.os !== os.id) continue;
+    try { atual = aplicar(atual, item.acao); } catch { /* recusada: a tela mostra o erro da fila */ }
+  }
+  return atual;
+}
+
+export interface Lista {
+  lista: OrdemServico[];
+  /** veio do que estava guardado no celular (sem sinal); com a hora da última atualização */
+  semSinalDesde: string | null;
+}
+
+export async function listarOS(): Promise<Lista> {
+  if (MODO_DEMO) { await espera(250); return { lista: structuredClone(demo.lista), semSinalDesde: null }; }
+  await carregarFila();
+  try {
+    const lista = await api<OrdemServico[]>('/os');
+    await guardarLista(lista);
+    return { lista: lista.map(comPendentes), semSinalDesde: null };
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 0) throw e;
+    const guardada = await listaGuardada();
+    if (!guardada.em) throw new ApiError(0, 'Sem sinal. A lista aparece aqui depois da primeira vez com internet.');
+    return { lista: guardada.lista.map(comPendentes), semSinalDesde: guardada.em };
+  }
+}
+
+export async function buscarOS(id: number): Promise<OrdemServico> {
+  if (MODO_DEMO) { await espera(150); return structuredClone(daDemo(id)); }
+  await carregarFila();
+  try {
+    const os = await api<OrdemServico>(`/os/${id}`);
+    await guardarOS(os);
+    return comPendentes(os);
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 0) throw e;
+    const guardada = await osGuardada(id);
+    if (!guardada) throw new ApiError(0, 'Sem sinal, e esta OS ainda não foi aberta neste celular.');
+    return comPendentes(guardada);
+  }
+}
+
+/** A OS como está no celular agora (sem ir ao servidor): para a tela acompanhar a fila subindo. */
+export async function osNoCelular(id: number): Promise<OrdemServico | null> {
+  if (MODO_DEMO) return structuredClone(daDemo(id));
+  const guardada = await osGuardada(id);
+  return guardada ? comPendentes(guardada) : null;
+}
 
 function daDemo(id: number): OrdemServico {
   const achada = demo.lista.find(o => o.id === id);
@@ -26,103 +87,61 @@ function daDemo(id: number): OrdemServico {
   return achada;
 }
 
-/** Na demonstração, a mesma regra de caminho que o backend vai aplicar. */
-function exigir(os: OrdemServico, de: Situacao[], acao: string) {
-  if (!de.includes(os.situacao)) throw new ApiError(409, `Não dá para ${acao} uma OS ${os.situacao}.`);
-}
-
-export async function listarOS(): Promise<OrdemServico[]> {
-  if (MODO_DEMO) { await espera(250); return structuredClone(demo.lista); }
-  return api<OrdemServico[]>('/os');
-}
-
-export async function buscarOS(id: number): Promise<OrdemServico> {
-  if (MODO_DEMO) { await espera(150); return structuredClone(daDemo(id)); }
-  return api<OrdemServico>(`/os/${id}`);
-}
-
-export async function fazerCheckin(id: number, aqui: Marcacao): Promise<OrdemServico> {
-  if (MODO_DEMO) {
-    await espera(300);
-    const os = daDemo(id);
-    exigir(os, ['aberta'], 'fazer check-in em');
-    Object.assign(os, { situacao: 'andamento', checkin: aqui, iniciada_em: aqui.em });
-    return structuredClone(os);
-  }
-  return api<OrdemServico>(`/os/${id}/checkin`, { method: 'POST', body: { lat: aqui.lat, lng: aqui.lng, precisao: aqui.precisao } });
-}
-
-export async function pausar(id: number): Promise<OrdemServico> {
+/** Aplica a regra agora, põe na fila e tenta subir. Fora da ordem, o erro aparece na hora. */
+async function agir(acao: Acao): Promise<OrdemServico> {
   if (MODO_DEMO) {
     await espera(200);
-    const os = daDemo(id);
-    exigir(os, ['andamento'], 'pausar');
-    os.situacao = 'pausada';
-    return structuredClone(os);
+    const nova = aplicar(daDemo(acao.os), acao);
+    demo.lista = demo.lista.map(o => (o.id === nova.id ? nova : o));
+    return structuredClone(nova);
   }
-  return api<OrdemServico>(`/os/${id}/pausar`, { method: 'POST' });
+  await carregarFila();
+  const base = (await osNoCelular(acao.os)) ?? (await buscarOS(acao.os));
+  const nova = aplicar(base, acao);
+  await enfileirar(acao);
+  void sincronizar();
+  return nova;
 }
 
-export async function retomar(id: number): Promise<OrdemServico> {
-  if (MODO_DEMO) {
-    await espera(200);
-    const os = daDemo(id);
-    exigir(os, ['pausada'], 'retomar');
-    os.situacao = 'andamento';
-    return structuredClone(os);
-  }
-  return api<OrdemServico>(`/os/${id}/retomar`, { method: 'POST' });
+const agora = () => new Date().toISOString();
+
+export function fazerCheckin(id: number, aqui: Marcacao): Promise<OrdemServico> {
+  return agir({ tipo: 'checkin', os: id, em: aqui.em, lat: aqui.lat, lng: aqui.lng, precisao: aqui.precisao });
 }
 
-export async function marcarItem(id: number, item: number, feito: boolean): Promise<OrdemServico> {
-  if (MODO_DEMO) {
-    const os = daDemo(id);
-    exigir(os, ['andamento'], 'mexer no checklist de');
-    const achado = os.checklist.find(i => i.id === item);
-    if (achado) achado.feito = feito;
-    return structuredClone(os);
-  }
-  return api<OrdemServico>(`/os/${id}/checklist/${item}`, { method: 'PATCH', body: { feito } });
+export function pausar(id: number): Promise<OrdemServico> {
+  return agir({ tipo: 'pausar', os: id, em: agora() });
+}
+
+export function retomar(id: number): Promise<OrdemServico> {
+  return agir({ tipo: 'retomar', os: id, em: agora() });
+}
+
+export function marcarItem(id: number, item: number, feito: boolean): Promise<OrdemServico> {
+  return agir({ tipo: 'item', os: id, item, feito, em: agora() });
 }
 
 export async function anexarFoto(id: number, arquivo: { uri: string; nome: string; tipo: string }, legenda: string): Promise<OrdemServico> {
-  if (MODO_DEMO) {
-    await espera(300);
-    const os = daDemo(id);
-    exigir(os, ['andamento', 'pausada'], 'anexar foto em');
-    os.fotos.push({ id: demo.proximaFoto++, url: arquivo.uri, legenda, tirada_em: new Date().toISOString() });
-    return structuredClone(os);
-  }
-  return enviarArquivo<OrdemServico>(`/os/${id}/fotos`, arquivo, { legenda });
+  const idCliente = novaIdentidade('f');
+  // a foto espera sinal num lugar que sobrevive ao app fechar
+  const uri = MODO_DEMO ? arquivo.uri : await guardarFotoDaFila(arquivo.uri, idCliente);
+  return agir({ tipo: 'foto', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, legenda });
 }
 
-export async function concluir(
+export function concluir(
   id: number,
   dados: { relato: string; assinatura: { nome: string; traco: string }; aqui: Marcacao },
 ): Promise<OrdemServico> {
-  if (MODO_DEMO) {
-    await espera(400);
-    const os = daDemo(id);
-    exigir(os, ['andamento'], 'concluir');
-    Object.assign(os, {
-      situacao: 'concluida', conclusao: dados.aqui, concluida_em: dados.aqui.em, relato: dados.relato,
-      assinatura: { ...dados.assinatura, em: dados.aqui.em },
-    });
-    return structuredClone(os);
-  }
-  return api<OrdemServico>(`/os/${id}/concluir`, {
-    method: 'POST',
-    body: { relato: dados.relato, assinatura: dados.assinatura, lat: dados.aqui.lat, lng: dados.aqui.lng, precisao: dados.aqui.precisao },
+  return agir({
+    tipo: 'concluir', os: id, em: dados.aqui.em, relato: dados.relato, assinatura: dados.assinatura,
+    lat: dados.aqui.lat, lng: dados.aqui.lng, precisao: dados.aqui.precisao,
   });
 }
 
-/** O que falta para poder concluir (vazio = pode). */
-export function pendenciasParaConcluir(os: OrdemServico): string[] {
-  const falta: string[] = [];
-  const abertos = os.checklist.filter(i => !i.feito).length;
-  if (abertos > 0) falta.push(abertos === 1 ? '1 item do checklist' : `${abertos} itens do checklist`);
-  if (os.fotos.length === 0) falta.push('pelo menos 1 foto');
-  return falta;
+/** Ao sair da conta: o que está no celular é do técnico que saiu. */
+export async function limparDoCelular(): Promise<void> {
+  await apagarFila();
+  await apagarCache();
 }
 
 /** Ordem da lista: o que pede ação primeiro, concluídas e canceladas no fim. */

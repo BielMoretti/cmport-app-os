@@ -3,9 +3,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, ApiError, renovarSessao, setAoExpirar, setAoRenovar, setToken } from '@/lib/api';
 import { apagarItem, lerItem, salvarItem } from '@/lib/armazenamento';
 import { MODO_DEMO } from '@/lib/config';
+import { limparDoCelular } from '@/lib/os';
 import type { Papel, RespostaDeLogin } from '@/lib/types';
 
 const CHAVE_SESSAO = 'cmport_os_sessao';
+// de quem são a fila e as OS guardadas no aparelho (outro técnico entrando = começa limpo)
+const CHAVE_DONO = 'cmport_os_dono';
 
 interface Sessao {
   token: string;
@@ -19,6 +22,7 @@ interface AuthContextValue {
   usuario: Sessao | null;
   carregando: boolean;
   login: (email: string, senha: string) => Promise<void>;
+  /** sair da conta: apaga a fila e as OS guardadas no aparelho (são de quem saiu) */
   logout: () => Promise<void>;
   /** primeiro acesso: troca a senha provisória pela da pessoa e libera o app */
   criarSenha: (senhaNova: string, senhaAtual?: string) => Promise<void>;
@@ -55,12 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void salvarItem(CHAVE_SESSAO, JSON.stringify(sessao)).catch(() => {});
   }, []);
 
-  const logout = useCallback(async () => {
+  // a sessão que vence sozinha NÃO apaga a fila: o técnico entra de novo e ela sobe
+  const encerrar = useCallback(async (apagarDados: boolean) => {
     senhaDoLogin.current = null;
     setToken(null);
     setUsuario(null);
     await apagarItem(CHAVE_SESSAO).catch(() => {});
+    if (apagarDados) await limparDoCelular().catch(() => {});
   }, []);
+  const logout = useCallback(() => encerrar(true), [encerrar]);
 
   // token renovado (dura 8 horas; o servidor renova por até 30 dias): grava o novo
   useEffect(() => {
@@ -94,9 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setAoExpirar(() => { void logout(); });
+    setAoExpirar(() => { void encerrar(false); });
     return () => setAoExpirar(null);
-  }, [logout]);
+  }, [encerrar]);
 
   const login = useCallback(async (email: string, senha: string) => {
     const limpo = email.trim().toLowerCase();
@@ -105,6 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // demonstração: qualquer e-mail e senha entram, sem rede
       ? { token: 'demo', nome: 'Técnico de demonstração', role: 'TECNICO', trocarSenha: false }
       : daResposta(await api<RespostaDeLogin>('/auth/login', { method: 'POST', body: { email: limpo, senha } }));
+    // outro técnico neste aparelho: a fila e as OS guardadas eram do anterior
+    const dono = await lerItem(CHAVE_DONO).catch(() => null);
+    if (dono && dono !== limpo) await limparDoCelular().catch(() => {});
+    await salvarItem(CHAVE_DONO, limpo).catch(() => {});
     senhaDoLogin.current = sessao.trocarSenha ? senha : null;
     guardar(sessao);
   }, [guardar]);
