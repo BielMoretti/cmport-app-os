@@ -21,6 +21,7 @@ import { api, ApiError } from './api';
 import { guardarFotoDaFila } from './arquivoDaFila';
 import { apagarCache, guardarLista, guardarOS, listaGuardada, osGuardada } from './cache';
 import { MODO_DEMO } from './config';
+import { apagarRascunhos } from './rascunho';
 import { demo } from './demo';
 import { apagarFila, carregarFila, enfileirar, itensDaFila, sincronizar } from './fila';
 import { aplicar, novaIdentidade, type Acao } from './regras';
@@ -156,6 +157,7 @@ export function concluir(
 export async function limparDoCelular(): Promise<void> {
   await apagarFila();
   await apagarCache();
+  await apagarRascunhos();
 }
 
 /** Ordem da lista: o que pede ação primeiro, concluídas e canceladas no fim. */

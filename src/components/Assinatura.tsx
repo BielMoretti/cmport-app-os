@@ -21,15 +21,17 @@ export function VerAssinatura({ traco }: { traco: string }) {
   );
 }
 
-export function CampoDeAssinatura({ aoMudar, aoDesenhar }: {
+export function CampoDeAssinatura({ aoMudar, aoDesenhar, inicial = '' }: {
   /** o traço atual ('' = vazio) */
   aoMudar: (traco: string) => void;
   /** true enquanto o dedo está na área: quem tem rolagem trava a rolagem */
   aoDesenhar?: (desenhando: boolean) => void;
+  /** traço recuperado do rascunho (o app tinha fechado no meio) */
+  inicial?: string;
 }) {
   const styles = useEstilos(criarEstilos);
   const { cores } = useTema();
-  const [traco, setTraco] = useState('');
+  const [traco, setTraco] = useState(inicial);
   const tamanho = useRef({ w: 1, h: 1 });
 
   const ponto = (e: GestureResponderEvent) => {

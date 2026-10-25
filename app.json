@@ -47,16 +47,14 @@
         "expo-image-picker",
         {
           "cameraPermission": "O CMPort OS usa a câmera para as fotos do serviço (antes e depois).",
-          "photosPermission": "O CMPort OS usa as suas fotos só para anexar ao serviço.",
-          "microphonePermission": false
+          "photosPermission": "O CMPort OS usa as suas fotos só para anexar ao serviço."
         }
       ],
       [
         "expo-camera",
         {
           "cameraPermission": "O CMPort OS usa a câmera para as fotos do serviço e para ler o QR das etiquetas.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false
+          "microphonePermission": "O CMPort OS usa o microfone só quando você toca em gravar um áudio na OS."
         }
       ],
       [
