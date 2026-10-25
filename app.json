@@ -61,6 +61,12 @@
           "color": "#1E3A8A",
           "defaultChannel": "os"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O CMPort OS grava o áudio que você manda na OS (relato ou recado ao escritório). Só quando você toca em gravar."
+        }
       ]
     ],
     "experiments": {

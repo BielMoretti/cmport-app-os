@@ -11,8 +11,9 @@ function pasta(): Directory {
   return d;
 }
 
-export async function guardarFotoDaFila(uri: string, id: string): Promise<string> {
-  const destino = new File(pasta(), `${id}.jpg`);
+export async function guardarFotoDaFila(uri: string, id: string, extensao = 'jpg'): Promise<string> {
+  // o áudio usa a mesma pasta (extensao 'm4a'): o que muda é só o nome do arquivo
+  const destino = new File(pasta(), `${id}.${extensao}`);
   if (!destino.exists) await new File(uri).copy(destino);
   return destino.uri;
 }

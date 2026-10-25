@@ -12,6 +12,7 @@ export type Acao =
   | { tipo: 'item'; os: number; item: number; feito: boolean; em: string }
   | { tipo: 'foto'; os: number; em: string; idCliente: string; uri: string; nome: string; tipoArquivo: string; legenda: string }
   | { tipo: 'mensagem'; os: number; em: string; idCliente: string; texto: string }
+  | { tipo: 'audio'; os: number; em: string; idCliente: string; uri: string; nome: string; tipoArquivo: string; duracao: number }
   | {
       tipo: 'concluir'; os: number; em: string; relato: string; assinatura: { nome: string; traco: string };
       lat: number | null; lng: number | null; precisao: number | null;
@@ -72,6 +73,13 @@ export function aplicar(atual: OrdemServico, a: Acao): OrdemServico {
       os.mensagens = [...(os.mensagens ?? []),
         { id: -((os.mensagens?.length ?? 0) + 1), em: a.em, autor: 'tecnico', nome: os.tecnico?.nome ?? 'Você', texto: a.texto }];
       break;
+    case 'audio':
+      exigir(os, ['aberta', 'andamento', 'pausada', 'concluida'], 'gravar áudio');
+      if (!(os.audios ?? []).some(x => x.url === a.uri)) {
+        os.audios = [...(os.audios ?? []),
+          { id: -((os.audios?.length ?? 0) + 1), url: a.uri, nome: os.tecnico?.nome ?? 'Você', em: a.em, duracao_s: a.duracao }];
+      }
+      break;
     case 'concluir': {
       exigir(os, ['andamento'], 'concluir');
       const falta = pendenciasParaConcluir(os);
@@ -99,6 +107,7 @@ export function jaFeita(os: OrdemServico, a: Acao): boolean {
     case 'item': return os.checklist.find(i => i.id === a.item)?.feito === a.feito;
     case 'concluir': return os.situacao === 'concluida';
     case 'foto':
+    case 'audio':
     case 'mensagem': return false;   // repetida o servidor já ignora pela identidade
   }
 }

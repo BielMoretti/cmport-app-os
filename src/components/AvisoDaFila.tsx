@@ -10,7 +10,7 @@ import { corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
 const RECUSADA: Record<Acao['tipo'], string> = {
   checkin: 'O check-in não foi aceito', pausar: 'A pausa não foi aceita', retomar: 'A retomada não foi aceita',
   item: 'O item do checklist não foi aceito', foto: 'A foto não foi aceita', concluir: 'A conclusão não foi aceita',
-  mensagem: 'A mensagem não foi aceita',
+  mensagem: 'A mensagem não foi aceita', audio: 'O áudio não foi aceito',
 };
 
 function plural(n: number) {

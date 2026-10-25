@@ -2,7 +2,7 @@
  * No navegador a foto reduzida é um blob: que morre ao recarregar a página. Para esperar na
  * fila, ela vira data: (texto), que fica guardado junto com a fila.
  */
-export async function guardarFotoDaFila(uri: string, _id: string): Promise<string> {
+export async function guardarFotoDaFila(uri: string, _id: string, _extensao = 'jpg'): Promise<string> {
   if (uri.startsWith('data:')) return uri;
   const blob = await (await fetch(uri)).blob();
   return await new Promise<string>((ok, erro) => {

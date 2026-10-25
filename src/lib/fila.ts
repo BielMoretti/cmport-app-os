@@ -1,7 +1,7 @@
 /**
  * Fila das ações do técnico que ainda não chegaram ao servidor (app sem internet).
  *
- * Toda ação (check-in, checklist, foto, mensagem, pausar, retomar, concluir) entra aqui com a hora em que
+ * Toda ação (check-in, checklist, foto, áudio, mensagem, pausar, retomar, concluir) entra aqui com a hora em que
  * aconteceu e sobe na ordem quando há sinal. Gasto de bateria: nada de ficar perguntando — a fila
  * tenta ao entrar uma ação, quando o celular avisa que a conexão voltou (NetInfo) e quando o app
  * volta para a tela. Sem rede, para na primeira tentativa e espera o próximo aviso.
@@ -74,7 +74,7 @@ export async function enfileirar(acao: Acao): Promise<void> {
 /** Tira a ação parada com erro (e as que esperavam por ela não mudam). */
 export async function descartar(id: string): Promise<void> {
   const item = estado.itens.find(i => i.id === id);
-  if (item?.acao.tipo === 'foto') apagarFotoDaFila(item.acao.uri);
+  if (item?.acao.tipo === 'foto' || item?.acao.tipo === 'audio') apagarFotoDaFila(item.acao.uri);
   await gravar(estado.itens.filter(i => i.id !== id));
 }
 
@@ -100,6 +100,9 @@ function enviar(a: Acao): Promise<OrdemServico> {
     case 'foto':
       return enviarArquivo(`/os/${a.os}/fotos`, { uri: a.uri, nome: a.nome, tipo: a.tipoArquivo },
         { legenda: a.legenda, em: a.em, id_cliente: a.idCliente });
+    case 'audio':
+      return enviarArquivo(`/os/${a.os}/audios`, { uri: a.uri, nome: a.nome, tipo: a.tipoArquivo },
+        { em: a.em, id_cliente: a.idCliente, duracao_s: String(a.duracao) });
     case 'mensagem':
       return api(`/os/${a.os}/mensagens`, { method: 'POST', body: { texto: a.texto, em: a.em, id_cliente: a.idCliente } });
     case 'concluir':
@@ -123,7 +126,7 @@ export function sincronizar(): Promise<void> {
         if (item.erro || paradas.has(acao.os)) { paradas.add(acao.os); continue; }
         try {
           await guardarOS(await enviar(acao));
-          if (acao.tipo === 'foto') apagarFotoDaFila(acao.uri);
+          if (acao.tipo === 'foto' || acao.tipo === 'audio') apagarFotoDaFila(acao.uri);
           await gravar(estado.itens.filter(i => i.id !== item.id));
           avisar({ semSinal: false });
         } catch (e) {

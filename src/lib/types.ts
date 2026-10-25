@@ -62,6 +62,15 @@ export interface Assinatura {
   em: string;
 }
 
+/** Áudio gravado na OS. id negativo = ainda no celular (a url é o arquivo local até subir). */
+export interface AudioDaOS {
+  id: number;
+  url: string;
+  nome: string;
+  em: string;
+  duracao_s: number | null;
+}
+
 /** Conversa com o escritório. id negativo = ainda no celular, esperando sinal. */
 export interface Mensagem {
   id: number;
@@ -103,6 +112,7 @@ export interface OrdemServico {
   /** posição na rota do dia que o escritório mandou (1 = a primeira) */
   rota_posicao?: number | null;
   mensagens?: Mensagem[];
+  audios?: AudioDaOS[];
 }
 
 export const ROTULO_SITUACAO: Record<Situacao, string> = {

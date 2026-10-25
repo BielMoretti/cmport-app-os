@@ -13,6 +13,7 @@
  *   POST  /os/{id}/fotos (multipart: arquivo, legenda, em, id_cliente)
  *   POST  /os/{id}/concluir {em, relato, assinatura, lat, lng, precisao}
  *   POST  /os/{id}/mensagens {texto, em, id_cliente}
+ *   POST  /os/{id}/audios (multipart: arquivo, em, id_cliente, duracao_s)
  *
  * No MODO_DEMO não há servidor nem fila: as mesmas regras mudam os dados de exemplo.
  */
@@ -127,6 +128,13 @@ export async function anexarFoto(id: number, arquivo: { uri: string; nome: strin
   // a foto espera sinal num lugar que sobrevive ao app fechar
   const uri = MODO_DEMO ? arquivo.uri : await guardarFotoDaFila(arquivo.uri, idCliente);
   return agir({ tipo: 'foto', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, legenda });
+}
+
+/** Áudio na OS: o arquivo espera sinal nos documentos do app, como a foto. */
+export async function anexarAudio(id: number, arquivo: { uri: string; nome: string; tipo: string }, duracao: number): Promise<OrdemServico> {
+  const idCliente = novaIdentidade('s');
+  const uri = MODO_DEMO ? arquivo.uri : await guardarFotoDaFila(arquivo.uri, idCliente, arquivo.nome.split('.').pop() ?? 'm4a');
+  return agir({ tipo: 'audio', os: id, em: agora(), idCliente, uri, nome: arquivo.nome, tipoArquivo: arquivo.tipo, duracao });
 }
 
 /** Mensagem para o escritório: sem sinal, espera na fila como as outras ações. */

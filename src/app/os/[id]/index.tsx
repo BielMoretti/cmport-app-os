@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VerAssinatura } from '@/components/Assinatura';
+import { GravarAudio, TocarAudio } from '@/components/AudioDaOS';
 import AvisoDaFila from '@/components/AvisoDaFila';
 import { Aviso, Botao, Campo, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
@@ -14,7 +15,7 @@ import { reduzirFoto } from '@/lib/foto';
 import { descreverMarcacao, marcarAqui } from '@/lib/local';
 import { irAteOLocal } from '@/lib/rota';
 import {
-  anexarFoto, buscarOS, fazerCheckin, mandarMensagem, marcarItem, osNoCelular, passouDoPrazo, pausar, pendenciasParaConcluir, quando,
+  anexarAudio, anexarFoto, buscarOS, fazerCheckin, mandarMensagem, marcarItem, osNoCelular, passouDoPrazo, pausar, pendenciasParaConcluir, quando,
   retomar,
 } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, raio, type Paleta } from '@/lib/tema';
@@ -220,6 +221,20 @@ export default function DetalheDaOS() {
                   </View>
                 ))}
               </View>
+            )}
+          </Secao>
+        )}
+
+        {(os.situacao === 'aberta' || os.situacao === 'andamento' || os.situacao === 'pausada' || os.situacao === 'concluida'
+          || (os.audios ?? []).length > 0) && (
+          <Secao titulo="Áudios" extra={(os.audios ?? []).length ? String(os.audios!.length) : undefined}>
+            {(os.audios ?? []).length === 0 && (
+              <Text style={styles.ajuda}>Explique o que viu ou deixe um recado ao escritório em vez de digitar (até 2 minutos).</Text>
+            )}
+            {(os.audios ?? []).map(a => <TocarAudio key={a.id} audio={a} />)}
+            {os.situacao !== 'cancelada' && os.situacao !== 'solicitada' && (
+              <GravarAudio desativado={!!ocupado} onErro={setErro}
+                onGravado={(arquivo, duracao) => agir('audio', () => anexarAudio(os.id, arquivo, duracao))} />
             )}
           </Secao>
         )}
