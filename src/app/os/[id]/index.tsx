@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerAssinatura } from '@/components/Assinatura';
 import { GravarAudio, TocarAudio } from '@/components/AudioDaOS';
 import AvisoDaFila from '@/components/AvisoDaFila';
+import Cronometro from '@/components/Cronometro';
 import { Aviso, Botao, Campo, Carregando, Cartao, SeloSituacao, Topo } from '@/components/ui';
 import { useEstilos, useTema } from '@/contexts/TemaContext';
 import { urlAbsoluta } from '@/lib/config';
@@ -130,6 +131,10 @@ export default function DetalheDaOS() {
 
         {erro && <Aviso texto={erro} />}
         <AvisoDaFila osId={os.id} />
+
+        {(os.situacao === 'andamento' || os.situacao === 'pausada') && os.iniciada_em && (
+          <Cronometro desde={os.iniciada_em} rodando={emAtendimento} foraDoPrazo={foraDoPrazo} />
+        )}
 
         {/* a ação principal de cada momento fica no topo */}
         {os.situacao === 'aberta' && (

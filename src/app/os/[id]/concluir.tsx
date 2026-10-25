@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CampoDeAssinatura } from '@/components/Assinatura';
+import Comemoracao from '@/components/Comemoracao';
 import { Aviso, Botao, Campo, Topo } from '@/components/ui';
 import { useEstilos } from '@/contexts/TemaContext';
 import { marcarAqui } from '@/lib/local';
-import { concluir } from '@/lib/os';
+import { concluir, listarOS, resumoDoDia, type ResumoDoDia } from '@/lib/os';
 import { componentes, corpo, espaco, fontes, type Paleta } from '@/lib/tema';
 
 export default function ConcluirOS() {
@@ -21,6 +22,8 @@ export default function ConcluirOS() {
   const [desenhando, setDesenhando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [concluida, setConcluida] = useState<{ numero: string; resumo: ResumoDoDia | null } | null>(null);
+  const voltar = useCallback(() => router.back(), [router]);
 
   const faltando = [
     !relato.trim() && 'o relato',
@@ -32,13 +35,17 @@ export default function ConcluirOS() {
     setErro(null);
     setEnviando(true);
     try {
-      await concluir(Number(id), { relato: relato.trim(), assinatura: { nome: nome.trim(), traco }, aqui: await marcarAqui() });
-      router.back();
+      const os = await concluir(Number(id), { relato: relato.trim(), assinatura: { nome: nome.trim(), traco }, aqui: await marcarAqui() });
+      // o resumo do dia sai da lista; sem sinal, a comemoração aparece sem ele
+      const resumo = await listarOS().then(r => resumoDoDia(r.lista)).catch(() => null);
+      setConcluida({ numero: os.numero, resumo });
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível concluir. Tente de novo.');
       setEnviando(false);
     }
   }
+
+  if (concluida) return <Comemoracao numero={concluida.numero} resumo={concluida.resumo} aoTerminar={voltar} />;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

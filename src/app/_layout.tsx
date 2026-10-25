@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -8,6 +8,7 @@ import { PlusJakartaSans_400Regular } from '@expo-google-fonts/plus-jakarta-sans
 import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
 import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
 
+import Abertura from '@/components/Abertura';
 import { Tela } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { TemaProvider, useTema } from '@/contexts/TemaContext';
@@ -27,13 +28,9 @@ function Rotas() {
   // se a fonte falhar, segue com a do sistema em vez de travar na espera
   const [fontesProntas, erroFontes] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold });
 
-  if (carregando || (!fontesProntas && !erroFontes)) {
-    return (
-      <View style={{ flex: 1, backgroundColor: cores.fundo, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={cores.azul} />
-      </View>
-    );
-  }
+  const pronto = !carregando && (fontesProntas || !!erroFontes);
+  // a abertura (o leão) cobre a espera e sai por cima da primeira tela quando tudo fica pronto
+  if (!pronto) return <View style={{ flex: 1, backgroundColor: cores.fundo }}><Abertura pronto={false} /></View>;
 
   return (
     <>
@@ -57,6 +54,7 @@ function Rotas() {
           <Stack.Screen name="login" />
         </Stack.Protected>
       </Stack>
+      <Abertura pronto />
     </>
   );
 }

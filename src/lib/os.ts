@@ -174,6 +174,47 @@ export function passouDoPrazo(os: OrdemServico): boolean {
   return !!os.prazo_em && new Date(os.prazo_em).getTime() < Date.now();
 }
 
+export interface ResumoDoDia {
+  feitas: number;
+  /** soma do check-in (ou da meia-noite, se começou antes) à conclusão de cada OS feita hoje; as pausas
+   *  entram, porque o app não guarda quanto durou cada uma */
+  minutos: number;
+  locais: number;
+  /** o que ainda é para hoje: em atendimento, pausada ou aberta agendada até o fim do dia */
+  faltam: number;
+}
+
+/** O dia do técnico: o que concluiu hoje e o que ainda falta para hoje. */
+export function resumoDoDia(lista: OrdemServico[], agora = new Date()): ResumoDoDia {
+  const hojeTexto = agora.toDateString();
+  const fimDeHoje = new Date(agora); fimDeHoje.setHours(23, 59, 59, 999);
+  const inicioDeHoje = new Date(agora); inicioDeHoje.setHours(0, 0, 0, 0);
+  const feitas = lista.filter(o => o.situacao === 'concluida' && o.concluida_em && new Date(o.concluida_em).toDateString() === hojeTexto);
+  // união dos intervalos: duas OS abertas ao mesmo tempo não contam o mesmo minuto duas vezes
+  const intervalos = feitas
+    .filter(o => o.iniciada_em && o.concluida_em)
+    .map(o => [Math.max(new Date(o.iniciada_em!).getTime(), inicioDeHoje.getTime()), new Date(o.concluida_em!).getTime()] as const)
+    .filter(([ini, fim]) => fim > ini)
+    .sort((a, b) => a[0] - b[0]);
+  let minutos = 0;
+  let ate = -Infinity;
+  for (const [ini, fim] of intervalos) {
+    if (fim <= ate) continue;
+    minutos += (fim - Math.max(ini, ate)) / 60_000;
+    ate = fim;
+  }
+  const faltam = lista.filter(o => o.situacao === 'andamento' || o.situacao === 'pausada'
+    || (o.situacao === 'aberta' && !!o.agendada_para && new Date(o.agendada_para) <= fimDeHoje)).length;
+  return { feitas: feitas.length, minutos: Math.round(minutos), locais: new Set(feitas.map(o => o.cliente.id)).size, faltam };
+}
+
+/** "1h25", "3h", "40 min" (curto: cabe num número grande sem quebrar a linha). */
+export function duracao(minutos: number): string {
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+}
+
 /** "Hoje, 09:00", "Amanhã, 14:30" ou "12/11, 10:00". */
 export function quando(iso: string | null): string {
   if (!iso) return 'Sem data';

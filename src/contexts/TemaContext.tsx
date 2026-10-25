@@ -5,32 +5,45 @@ import { paletas, type Modo, type Paleta } from '@/lib/tema';
 
 const CHAVE_TEMA = 'cmport_os_tema';
 
+/** "auto" segue a hora: escuro das 18h às 6h, claro de dia (sol forte na rua). */
+export type PreferenciaDeTema = 'auto' | Modo;
+
+const modoDaHora = (d = new Date()): Modo => (d.getHours() >= 18 || d.getHours() < 6 ? 'escuro' : 'claro');
+
 interface TemaContextValue {
   modo: Modo;
   cores: Paleta;
-  alternar: () => void;
+  preferencia: PreferenciaDeTema;
+  escolher: (p: PreferenciaDeTema) => void;
 }
 
 const TemaContext = createContext<TemaContextValue | null>(null);
 
 export function TemaProvider({ children }: { children: ReactNode }) {
-  const [modo, setModo] = useState<Modo>('escuro');
+  const [preferencia, setPreferencia] = useState<PreferenciaDeTema>('auto');
+  const [modoDoRelogio, setModoDoRelogio] = useState<Modo>(() => modoDaHora());
 
   useEffect(() => {
     lerItem(CHAVE_TEMA)
-      .then(salvo => { if (salvo === 'claro' || salvo === 'escuro') setModo(salvo); })
+      .then(salvo => { if (salvo === 'claro' || salvo === 'escuro' || salvo === 'auto') setPreferencia(salvo); })
       .catch(() => {});
   }, []);
 
-  const alternar = useCallback(() => {
-    setModo(atual => {
-      const novo: Modo = atual === 'claro' ? 'escuro' : 'claro';
-      salvarItem(CHAVE_TEMA, novo).catch(() => {});
-      return novo;
-    });
+  // no automático, confere a hora a cada minuto: às 18h o app escurece sozinho
+  useEffect(() => {
+    if (preferencia !== 'auto') return;
+    const t = setInterval(() => setModoDoRelogio(modoDaHora()), 60_000);
+    return () => clearInterval(t);
+  }, [preferencia]);
+
+  const escolher = useCallback((p: PreferenciaDeTema) => {
+    setPreferencia(p);
+    setModoDoRelogio(modoDaHora());
+    salvarItem(CHAVE_TEMA, p).catch(() => {});
   }, []);
 
-  const valor = useMemo(() => ({ modo, cores: paletas[modo], alternar }), [modo, alternar]);
+  const modo = preferencia === 'auto' ? modoDoRelogio : preferencia;
+  const valor = useMemo(() => ({ modo, cores: paletas[modo], preferencia, escolher }), [modo, preferencia, escolher]);
 
   return <TemaContext.Provider value={valor}>{children}</TemaContext.Provider>;
 }

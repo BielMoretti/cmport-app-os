@@ -1,22 +1,28 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AvisoDaFila from '@/components/AvisoDaFila';
 import { Surgir } from '@/components/movimento';
 import { Aviso, Botao, Cartao, LogoPlaca, Tela } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEstilos, useTema } from '@/contexts/TemaContext';
+import { useEstilos, useTema, type PreferenciaDeTema } from '@/contexts/TemaContext';
 import { MODO_DEMO } from '@/lib/config';
 import { useFila } from '@/lib/fila';
-import { componentes, corpo, espaco, fontes, type Paleta } from '@/lib/tema';
+import { componentes, corpo, espaco, fontes, raio, vidro, type Paleta } from '@/lib/tema';
+
+const TEMAS: { valor: PreferenciaDeTema; rotulo: string }[] = [
+  { valor: 'auto', rotulo: 'Automático' },
+  { valor: 'claro', rotulo: 'Claro' },
+  { valor: 'escuro', rotulo: 'Escuro' },
+];
 
 const PAPEL: Record<string, string> = { TECNICO: 'Técnico', SUPERVISOR: 'Supervisor', ADMIN: 'Administrador' };
 
 export default function Conta() {
   const styles = useEstilos(criarEstilos);
   const { usuario, logout } = useAuth();
-  const { modo, alternar } = useTema();
+  const { cores, preferencia, escolher } = useTema();
   const margem = useSafeAreaInsets();
   const { itens } = useFila();
   // sair apaga do aparelho o que não subiu: com ação na fila, o primeiro toque só avisa
@@ -46,7 +52,23 @@ export default function Conta() {
       </Surgir>
       <AvisoDaFila />
       <View style={{ gap: espaco[3] }}>
-        <Botao tipo="secundario" rotulo={modo === 'escuro' ? 'Usar tema claro' : 'Usar tema escuro'} onPress={alternar} />
+        <View style={{ gap: espaco[2] }}>
+          <Text style={styles.rotulo}>Tema</Text>
+          <View style={[styles.seletor, vidro(cores)]} accessibilityRole="radiogroup">
+            {TEMAS.map(t => {
+              const ativo = t.valor === preferencia;
+              return (
+                <Pressable key={t.valor} onPress={() => escolher(t.valor)} accessibilityRole="radio" aria-checked={ativo}
+                  style={[styles.opcao, ativo && { backgroundColor: cores.azul }]}>
+                  <Text style={[styles.opcaoTexto, ativo && { color: cores.sobreAzul }]}>{t.rotulo}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.papel}>
+            {preferencia === 'auto' ? 'Claro de dia e escuro a partir das 18h, sozinho.' : 'Fica sempre assim, a qualquer hora.'}
+          </Text>
+        </View>
         {confirmarSaida && pendentes > 0 && (
           <Aviso texto={`Ainda há ${pendentes === 1 ? '1 ação' : `${pendentes} ações`} sem enviar. Sair agora apaga do celular: espere o sinal voltar para não perder o atendimento.`} />
         )}
@@ -60,6 +82,10 @@ export default function Conta() {
 const criarEstilos = (c: Paleta) => StyleSheet.create({
   conteudo: { paddingHorizontal: componentes.tela.margem, gap: espaco[5], width: '100%', maxWidth: componentes.conteudo.larguraMaxima, alignSelf: 'center' },
   titulo: { fontFamily: fontes.nome, fontSize: corpo.titulo, color: c.texto },
+  rotulo: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.textoSuave },
+  seletor: { flexDirection: 'row', borderRadius: raio.pilula, padding: espaco[1], gap: espaco[1] },
+  opcao: { flex: 1, height: componentes.chip.altura + espaco[2], borderRadius: raio.pilula, alignItems: 'center', justifyContent: 'center' },
+  opcaoTexto: { fontFamily: fontes.textoForte, fontSize: corpo.pequeno, color: c.texto },
   pessoa: { flexDirection: 'row', alignItems: 'center', gap: espaco[3] },
   nome: { fontFamily: fontes.nome, fontSize: corpo.nome, color: c.texto },
   papel: { fontFamily: fontes.texto, fontSize: corpo.legenda, color: c.textoSuave },
